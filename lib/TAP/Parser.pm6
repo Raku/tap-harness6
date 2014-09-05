@@ -121,16 +121,64 @@ class TAP::Parser {
 		}
 	}
 
+	grammar Grammar {
+		token TOP { ^ <line>+ }
+		token ws { <[ \t]> }
+		token line {
+			^^ [ <plan> | <test> | <bailout> | <version> ] \n
+		}
+		rule directive {
+			 '#' $<directive>=['SKIP' | 'TODO'] $<explanation>=[\N*]
+		}
+		token plan {
+			'1..' $<count>=[\d+] <directive>?
+		}
+		token test {
+			$<nok>=['not '?] 'ok' \s* $<num>=[\d] '-'? [ \s+ $<description>=[\N*] ]? <directive>?
+		}
+		token bailout {
+			'Bail out!' [ ' ' $<explanation>=[\N*] ]?
+		}
+		token version {
+			'TAP VERSION ' $<version>=[\d+]
+		}
+	}
+	class Action {
+		my $raw = '';
+		method TOP($/) {
+			make [ $/<line>.map(*.ast) ];
+		}
+		method line($/) {
+			make $/.values[0].ast;
+		}
+		method plan($/) {
+			make Plan.new(:raw($/.Str), :tests($<count>.Int), | %( $/.kv.map( * => ~* )));
+		}
+		method test($/) {
+			make Test.new(:raw($/.Str), :ok(!$<nok>), :number($<num>.Int), | %( $/.kv.map( * => ~* )));
+		}
+		method bailout($/) {
+			make Bailout.new(:raw($/.Str), | %( $/.kv.map( * => ~* )));
+		}
+		method version($/) {
+			make Version.new(:raw($/.Str), :version($<version>.Int));
+		}
+	}
+
 	class Lexer {
-		submethod BUILD(Supply:D :$input, State :$state) {
+		has $!input;
+		has $!grammar = Grammar.new;
+		has $!actions = Action.new;
+		submethod BUILD(Supply:D :$!input, State :$state) {
 			my $buffer = '';
 			my $done = False;
-			$input.act(-> $data {
+			$!input.act(-> $data {
 				$buffer ~= $data;
-				while ($buffer ~~ / ^ $<line>=[\N+] \n/) {
-					my $line = $<line>.Str;
-					$buffer.=subst(/\N+\n/, '');
-					$state.handle_result(self.parse_line($line));
+				while ($!grammar.subparse($buffer, :actions($!actions))) -> $match {
+					$buffer.=substr($match.to);
+					for @($match.made) -> $result {
+						$state.handle_result($result);
+					}
 				}
 			},
 			:done({
@@ -139,25 +187,6 @@ class TAP::Parser {
 					$state.finalize();
 				}
 			}));
-		}
-		method parse_line(Str $raw) {
-			return do given $raw {
-				when m/ ^ '1..' $<num>=[\d] [ ' '? '#' $<directive>=['SKIP' | 'TODO'] \s+ $<explanation>=[.*] ]? $ / {
-					Plan.new(:$raw, :tests($<num>.Int), | %( $/.kv.map( * => ~* )));
-				}
-				when m/ ^ $<nok>=['not '?] 'ok' [ ' ' $<num>=[\d+] ]? '-'? [ ' ' $<description>=[.*] ]? $ / {
-					Test.new(:$raw, :ok(!$<nok>), :number($<num>.Int), | %( $/.kv.map( * => ~* )));
-				}
-				when m/ ^ 'Bail out!' ' '? $<explanation>=[.*] / {
-					Bailout(:$raw, | %( $/.kv.map( * => ~* )));
-				}
-				when m/ ^ 'TAP VERSION ' $<version>=[\d+] $/ {
-					Version.new(:$raw, :version($<version>.Int));
-				}
-				default {
-					Unknown.new(:$raw);
-				}
-			}
 		}
 	}
 }
