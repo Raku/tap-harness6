@@ -5,17 +5,18 @@ class TAP::Parser {
 		method kill() { }
 	}
 
+	class State { ... }
 	class Lexer { ... }
 
 	has Source $!source;
+	has State $!state;
 	has Lexer $!lexer;
 	has Promise $.done;
 
 	submethod BUILD(Source :$!source) {
-		$!lexer = Lexer.new(:input($!source.input));
-		my $parsed = Promise.new;
-		$!lexer.output.act(-> $result { self!handle_result($result) }, :done(-> { self!finalize(); $parsed.keep(True) }));
-		$!done = Promise.allof($parsed, $!source.done);
+		$!state = State.new();
+		$!lexer = Lexer.new(:input($!source.input), :$!state);
+		$!done = Promise.allof($!state.done, $!source.done);
 	}
 
 	class Source::Proc does Source {
@@ -69,74 +70,73 @@ class TAP::Parser {
 	class Unknown does Entry {
 	}
 
-	has Int $.tests-planned;
-	has Int $!seen-anything = 0;
-	has Bool $!seen-plan = False;
-	has Int $!tests-run = 0;
-	has Int $.passed = 0;
-	has Int $.failed = 0;
-	has Str @.warnings;
+	class State {
+		has Int $.tests-planned;
+		has Int $!seen-anything = 0;
+		has Bool $!seen-plan = False;
+		has Int $!tests-run = 0;
+		has Int $.passed = 0;
+		has Int $.failed = 0;
+		has Str @.warnings;
+		has Promise $.done = Promise.new;
 
-	method !handle_result(Entry $result) {
-		given $result {
-			when Plan {
-				if $!seen-plan {
-					self!add_warning('Seen a second plan');
+		method handle_result(Entry $result) {
+			given $result {
+				when Plan {
+					if $!seen-plan {
+						self!add_warning('Seen a second plan');
+					}
+					else {
+						$!tests-planned = $result.tests;
+						$!seen-plan = True;
+					}
 				}
-				else {
-					$!tests-planned = $result.tests;
-					$!seen-plan = True;
+				when Test {
+					my $found-number = $result.number;
+					my $expected-number = ++$!tests-run;
+					if $found-number.defined && ($found-number != $expected-number) {
+						self!add_warning("Tests out of sequence.  Found ($found-number) but expected ($expected-number)");
+					}
+					($result ?? $!passed !! $!failed)++;
+				}
+				default {
+					...;
 				}
 			}
-			when Test {
-				my $found-number = $result.number;
-				my $expected-number = ++$!tests-run;
-				if $found-number.defined && ($found-number != $expected-number) {
-					self!add_warning("Tests out of sequence.  Found ($found-number) but expected ($expected-number)");
-				}
-				($result ?? $!passed !! $!failed)++;
-			}
-			default {
-				...;
-			}
+			$!seen-anything++;
 		}
-		$!seen-anything++;
-	}
-	method !finalize() {
-		if !$!seen-plan {
-			self!add_warning('No plan found in TAP output');
-			if $!tests-run != ($!tests-planned || 0) {
-				if defined $!tests-planned {
-					self!add_warning("Bad plan.  You planned $!tests-planned tests but ran $!tests-run.");
+		method finalize() {
+			if !$!seen-plan {
+				self!add_warning('No plan found in TAP output');
+				if $!tests-run != ($!tests-planned || 0) {
+					if defined $!tests-planned {
+						self!add_warning("Bad plan.  You planned $!tests-planned tests but ran $!tests-run.");
+					}
 				}
 			}
+			$!done.keep(True);
 		}
-	}
-
-	method !add_warning($warning) {
-		push @!warnings, $warning;
+		method !add_warning($warning) {
+			push @!warnings, $warning;
+		}
 	}
 
 	class Lexer {
-		has Supply $.input;
-		has Str $!buffer;
-		has Supply $.output;
-		has Bool $!done;
-
-		submethod BUILD(Supply:D :$!input, Supply:D :$!output = Supply.new) {
-			$!buffer = '';
-			$!input.act(-> $data {
-				$!buffer ~= $data;
-				while ($!buffer ~~ / $<line>=[\N+] \n/) {
+		submethod BUILD(Supply:D :$input, State :$state) {
+			my $buffer = '';
+			my $done = False;
+			$input.act(-> $data {
+				$buffer ~= $data;
+				while ($buffer ~~ / ^ $<line>=[\N+] \n/) {
 					my $line = $<line>.Str;
-					$!buffer.=subst(/\N+\n/, '');
-					$!output.more(self.parse_line($line));
+					$buffer.=subst(/\N+\n/, '');
+					$state.handle_result(self.parse_line($line));
 				}
 			},
 			:done({
-				if !$!done {
-					$!done = True;
-					$!output.done();
+				if !$done {
+					$done = True;
+					$state.finalize();
 				}
 			}));
 		}
