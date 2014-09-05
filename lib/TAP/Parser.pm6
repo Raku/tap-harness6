@@ -81,7 +81,7 @@ class TAP::Parser {
 			when Test {
 				my $found-number = $result.number;
 				my $expected-number = ++$!tests-run;
-				if defined $found-number && $found-number != $expected-number {
+				if $found-number.defined && ($found-number != $expected-number) {
 					self!add_warning("Tests out of sequence.  Found ($found-number) but expected ($expected-number)");
 				}
 				($result ?? $!passed !! $!failed)++;
