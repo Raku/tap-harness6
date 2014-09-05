@@ -8,7 +8,6 @@ class TAP::Parser {
 	class Lexer { ... }
 
 	has Source $!source;
-	has Supply $!lexer_stream;
 	has Lexer $!lexer;
 	has Promise $.done;
 
