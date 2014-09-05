@@ -32,6 +32,17 @@ class TAP::Parser {
 			$!process.kill;
 		}
 	}
+	class Source::File does Source {
+		has Str $.filename;
+		has Supply $.input = Supply.new;
+		has Thread $.done = start {
+			my $fh = open $!filename, :r;
+			for $fh.lines -> $line {
+				$!input.more($line);
+			}
+			$!input.done();
+		};
+	}
 
 	role Result {
 		has Str $.raw = !!! 'Raw input is required';
