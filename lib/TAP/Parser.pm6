@@ -43,30 +43,30 @@ class TAP::Parser {
 		};
 	}
 
-	role Result {
+	role Entry {
 		has Str $.raw = !!! 'Raw input is required';
 	}
-	class Version does Result {
+	class Version does Entry {
 		has Int $.version;
 	}
-	class Plan does Result {
+	class Plan does Entry {
 		has Int $.tests = !!! 'tests is required';
 		has Str $.directive;
 		has Str $.explanation;
 		has Int @.todo_list;
 	}
-	class Test does Result {
+	class Test does Entry {
 		has Bool $.ok;
 		has Int $.number;
 		has Str $.description;
 	}
-	class Bailout does Result {
+	class Bailout does Entry {
 		has Str $.explanation;
 	}
-	class Comment does Result {
+	class Comment does Entry {
 		has Str $.comment = !!! 'comment is required';
 	}
-	class Unknown does Result {
+	class Unknown does Entry {
 	}
 
 	has Int $.tests-planned;
@@ -77,7 +77,7 @@ class TAP::Parser {
 	has Int $.failed = 0;
 	has Str @.warnings;
 
-	method !handle_result(Result $result) {
+	method !handle_result(Entry $result) {
 		given $result {
 			when Plan {
 				if $!seen-plan {
