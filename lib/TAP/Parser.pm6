@@ -85,7 +85,7 @@ class TAP::Parser {
 		has Int $.tests-run;
 		has Int $.passed;
 		has Int $.failed;
-		has Str @.warnings;
+		has Str @.errors;
 		has Proc::Status $.exit-status;
 	}
 
@@ -99,7 +99,7 @@ class TAP::Parser {
 		has Int $tests-run = 0;
 		has Int $passed = 0;
 		has Int $failed = 0;
-		has Str @warnings;
+		has Str @!errors;
 
 		has Int $!seen-anything = 0;
 		has Bool $!seen-plan = False;
@@ -109,7 +109,7 @@ class TAP::Parser {
 			given $result {
 				when Plan {
 					if $!seen-plan {
-						self!add_warning('Seen a second plan');
+						self!add_error('Seen a second plan');
 					}
 					else {
 						$!tests-planned = $result.tests;
@@ -120,7 +120,7 @@ class TAP::Parser {
 					my $found-number = $result.number;
 					my $expected-number = ++$!tests-run;
 					if $found-number.defined && ($found-number != $expected-number) {
-						self!add_warning("Tests out of sequence.  Found ($found-number) but expected ($expected-number)");
+						self!add_error("Tests out of sequence.  Found ($found-number) but expected ($expected-number)");
 					}
 					($result.is_ok ?? $!passed !! $!failed)++;
 				}
@@ -132,20 +132,20 @@ class TAP::Parser {
 		}
 		method end-input() {
 			if !$!seen-plan {
-				self!add_warning('No plan found in TAP output');
+				self!add_error('No plan found in TAP output');
 				if $!tests-run != ($!tests-planned || 0) {
 					if defined $!tests-planned {
-						self!add_warning("Bad plan.  You planned $!tests-planned tests but ran $!tests-run.");
+						self!add_error("Bad plan.  You planned $!tests-planned tests but ran $!tests-run.");
 					}
 				}
 			}
 			$!done.keep(True);
 		}
 		method finalize(Proc::Status $exit-status) {
-			return Result.new(:$tests-planned, :$tests-run, :$passed, :$failed, :@warnings, :$exit-status);
+			return Result.new(:$tests-planned, :$tests-run, :$passed, :$failed, :@errors, :$exit-status);
 		}
-		method !add_warning(Str $warning) {
-			push @!warnings, $warning;
+		method !add_error(Str $error) {
+			push @!errors, $error;
 		}
 	}
 
