@@ -16,22 +16,33 @@ class TAP::Harness {
 
 	has SourceHandler @.handlers = SourceHandler::Perl6.new();
 	has Any @.sources;
-	has Promise $!kill = Promise.new;
+
+	class Run {
+		has Promise $.done;
+		has Promise $!kill;
+		method kill(Any $reason = True) {
+			$!kill.keep($reason) = Promise.new;
+		}
+		method result() {
+			return $!done.result;
+		}
+	}
 
 	method run(Int :$parallel = 2) {
 		my (@working, @results);
-		return start {
+		my $kill = Promise.new;
+		my $done = start {
 			for @!sources -> $name {
-				last if $!kill;
+				last if $kill;
 				my $source = @!handlers.max(*.can_handle($name)).make_source($name);
-				@working.push(TAP::Parser.new(:$name, :$source, :$!kill));
+				@working.push(TAP::Parser.new(:$name, :$source, :$kill));
 				next if @working < $parallel;
-				await Promise.anyof(@working.map(*.done), $!kill);
+				await Promise.anyof(@working.map(*.done), $kill);
 				reap-finished();
 			}
-			await Promise.anyof(Promise.allof(@working.map(*.done)), $!kill) if not $!kill;
+			await Promise.anyof(Promise.allof(@working.map(*.done)), $kill) if not $kill;
 			reap-finished();
-			if ($!kill) {
+			if ($kill) {
 				.kill for @working;
 			}
 			@results;
@@ -40,8 +51,6 @@ class TAP::Harness {
 			@results.push(@working.grep(*).map(*.result));
 			@working .= grep(!*);
 		}
-	}
-	method kill(Any $reason = True) {
-		$!kill.keep($reason);
+		return Run.new(:$done, :$kill);
 	}
 }
