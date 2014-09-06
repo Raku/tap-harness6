@@ -54,12 +54,17 @@ class TAP::Parser {
 		has Int $.tests = !!! 'tests is required';
 		has Str $.directive;
 		has Str $.explanation;
-		has Int @.todo_list;
 	}
 	class Test does Entry {
 		has Bool $.ok;
 		has Int $.number;
 		has Str $.description;
+		has Str $.directive;
+		has Str $.explanation;
+
+		method is_ok() {
+			return ?($!directive || $!ok);
+		}
 	}
 	class Bailout does Entry {
 		has Str $.explanation;
@@ -97,7 +102,7 @@ class TAP::Parser {
 					if $found-number.defined && ($found-number != $expected-number) {
 						self!add_warning("Tests out of sequence.  Found ($found-number) but expected ($expected-number)");
 					}
-					($result ?? $!passed !! $!failed)++;
+					($result.is_ok ?? $!passed !! $!failed)++;
 				}
 				default {
 					...;
@@ -122,25 +127,26 @@ class TAP::Parser {
 	}
 
 	grammar Grammar {
-		token TOP { ^ <line>+ }
-		token ws { <[ \t]> }
+		token TOP { ^ <line>+ $ }
 		token line {
-			^^ [ <plan> | <test> | <bailout> | <version> ] \n
-		}
-		rule directive {
-			 '#' $<directive>=['SKIP' | 'TODO'] $<explanation>=[\N*]
+			^^ [ <plan> | <test> | <bailout> | <version> || <unknown> ] \n
 		}
 		token plan {
-			'1..' $<count>=[\d+] <directive>?
+			'1..' $<count>=[\d+] [ '#' \s* $<directive>=['SKIP'] \S+ \s+ $<explanation>=[\N*] ]?
 		}
 		token test {
-			$<nok>=['not '?] 'ok' \s* $<num>=[\d] '-'? [ \s+ $<description>=[\N*] ]? <directive>?
+			$<nok>=['not '?] 'ok' \s* $<num>=[\d] ' -'?
+				[ \s+ $<description>=[<-[\n\#]>*] ]?
+				[ \s* '#' \s* $<directive>=['SKIP' | 'TODO'] \s+ $<explanation>=[\N*] ]?
 		}
 		token bailout {
 			'Bail out!' [ ' ' $<explanation>=[\N*] ]?
 		}
 		token version {
 			'TAP VERSION ' $<version>=[\d+]
+		}
+		token unknown {
+			\N+
 		}
 	}
 	class Action {
@@ -155,13 +161,16 @@ class TAP::Parser {
 			make Plan.new(:raw($/.Str), :tests($<count>.Int), | %( $/.kv.map( * => ~* )));
 		}
 		method test($/) {
-			make Test.new(:raw($/.Str), :ok(!$<nok>), :number($<num>.Int), | %( $/.kv.map( * => ~* )));
+			make Test.new(:raw($/.Str), :ok(!$<nok>.Str), :number($<num>.Int), | %( $/.kv.map( * => ~* )));
 		}
 		method bailout($/) {
 			make Bailout.new(:raw($/.Str), | %( $/.kv.map( * => ~* )));
 		}
 		method version($/) {
 			make Version.new(:raw($/.Str), :version($<version>.Int));
+		}
+		method unknown($/) {
+			make Unknown.new(:raw($/.Str));
 		}
 	}
 
