@@ -289,5 +289,35 @@ class TAP::Parser {
 			}));
 		}
 	}
+
+	class Aggregator {
+		has Result %!results-for;
+		has Result @!parse-order;
+
+		has Int $.parsed;
+		has Int $.tests-planned;
+		has Int $.tests-run;
+		has Int $.passed;
+		has Int $.failed;
+		has Str @.errors;
+
+		method add_result(Result $result) {
+			my $description = $result.name;
+			die "You already have a parser for ($description). Perhaps you have run the same test twice." if %!results-for{$description};
+			%!results-for{$description} = $result;
+			@!parse-order.push($result);
+
+			$!parsed++;
+			$!tests-planned += $result.tests-planned;
+			$!tests-run += $result.tests-run;
+			$!passed += $result.passed;
+			$!failed += $result.failed;
+			@!errors.push(@($result.errors));
+		}
+
+		method descriptions {
+			return @!parse-order.map(*.name);
+		}
+	}
 }
 
