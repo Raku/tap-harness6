@@ -95,6 +95,7 @@ class TAP::Parser {
 	}
 
 	class Result {
+		has Str $.name;
 		has Int $.tests-planned;
 		has Int $.tests-run;
 		has Int $.passed;
@@ -105,7 +106,7 @@ class TAP::Parser {
 
 	has Result $!result;
 	method result {
-		return $!done ?? $!result //= $!state.finalize($!source.exit-status) !! Nil;
+		return $!done ?? $!result //= $!state.finalize($!name, $!source.exit-status) !! Nil;
 	}
 
 	class State {
@@ -185,8 +186,8 @@ class TAP::Parser {
 			}
 			$!done.keep(True);
 		}
-		method finalize(Proc::Status $exit-status) {
-			return Result.new(:$!tests-planned, :$!tests-run, :$!passed, :$!failed, :@!errors, :$exit-status);
+		method finalize(Str $name, Proc::Status $exit-status) {
+			return Result.new(:$name, :$!tests-planned, :$!tests-run, :$!passed, :$!failed, :@!errors, :$exit-status);
 		}
 		method !add-error(Str $error) {
 			push @!errors, $error;
