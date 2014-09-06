@@ -72,8 +72,14 @@ class TAP::Parser {
 		has Str $.directive;
 		has Str $.explanation;
 
-		method is_ok() {
-			return ?($!directive || $!ok);
+		method is-ok() {
+			return $!ok || $.is-todo;
+		}
+		method is-todo() {
+			return $!directive.defined && $!directive ~~ m:i/ ^ 'TODO' /;
+		}
+		method is-skipped() {
+			return $!directive.defined && $!directive ~~ m:i/ ^ 'SKIP' /;
 		}
 	}
 	class Bailout does Entry {
@@ -128,7 +134,7 @@ class TAP::Parser {
 					if $found-number.defined && ($found-number != $expected-number) {
 						self!add_error("Tests out of sequence.  Found ($found-number) but expected ($expected-number)");
 					}
-					($result.is_ok ?? $!passed !! $!failed)++;
+					($result.is-ok ?? $!passed !! $!failed)++;
 				}
 				when Bailout {
 					if $!bailout.defined {
@@ -175,7 +181,7 @@ class TAP::Parser {
 		token test {
 			$<nok>=['not '?] 'ok' [ <ws> $<num>=[\d] ] ' -'?
 				[ <ws>+ $<description>=[<-[\n\#]>+] ]?
-				[ <ws>* '#' <ws>* $<directive>=[:i [ 'SKIP' \S* | 'TODO'] ] <ws>+ $<explanation>=[\N*] ]?
+				[ <ws>* '#' <ws>* $<directive>=[:i [ 'SKIP' | 'TODO'] \S* ] <ws>+ $<explanation>=[\N*] ]?
 				<ws>*
 		}
 		token bailout {
