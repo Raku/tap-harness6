@@ -205,7 +205,7 @@ class TAP::Parser {
 			'Bail out!' [ <ws> $<explanation>=[\N*] ]?
 		}
 		token version {
-			'TAP VERSION ' $<version>=[\d+]
+			:i 'TAP version ' $<version>=[\d+]
 		}
 		token comment {
 			'#' <ws>* $<comment>=[\N+]
