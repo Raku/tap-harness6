@@ -156,12 +156,12 @@ class TAP::Parser {
 			^^ [ <plan> | <test> | <bailout> | <version> | <comment> || <unknown> ] \n
 		}
 		token plan {
-			'1..' $<count>=[\d+] [ '#' <ws>* $<directive>=['SKIP'] \S+ <ws>+ $<explanation>=[\N*] ]?
+			'1..' $<count>=[\d+] [ '#' <ws>* $<directive>=[:i 'SKIP'] \S+ <ws>+ $<explanation>=[\N*] ]?
 		}
 		token test {
 			$<nok>=['not '?] 'ok' [ <ws> $<num>=[\d] ] ' -'?
 				[ <ws>+ $<description>=[<-[\n\#]>+] ]?
-				[ <ws>* '#' <ws>* $<directive>=['SKIP' \S* | 'TODO'] <ws>+ $<explanation>=[\N*] ]?
+				[ <ws>* '#' <ws>* $<directive>=[:i [ 'SKIP' \S* | 'TODO'] ] <ws>+ $<explanation>=[\N*] ]?
 				<ws>*
 		}
 		token bailout {
