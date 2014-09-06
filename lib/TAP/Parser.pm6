@@ -121,7 +121,7 @@ class TAP::Parser {
 			given $result {
 				when Plan {
 					if $!seen-plan {
-						self!add_error('Seen a second plan');
+						self!add-error('Seen a second plan');
 					}
 					else {
 						$!tests-planned = $result.tests;
@@ -132,7 +132,7 @@ class TAP::Parser {
 					my $found-number = $result.number;
 					my $expected-number = ++$!tests-run;
 					if $found-number.defined && ($found-number != $expected-number) {
-						self!add_error("Tests out of sequence.  Found ($found-number) but expected ($expected-number)");
+						self!add-error("Tests out of sequence.  Found ($found-number) but expected ($expected-number)");
 					}
 					($result.is-ok ?? $!passed !! $!failed)++;
 				}
@@ -152,10 +152,10 @@ class TAP::Parser {
 		}
 		method end-input() {
 			if !$!seen-plan {
-				self!add_error('No plan found in TAP output');
+				self!add-error('No plan found in TAP output');
 				if $!tests-run != ($!tests-planned || 0) {
 					if defined $!tests-planned {
-						self!add_error("Bad plan.  You planned $!tests-planned tests but ran $!tests-run.");
+						self!add-error("Bad plan.  You planned $!tests-planned tests but ran $!tests-run.");
 					}
 				}
 			}
@@ -164,7 +164,7 @@ class TAP::Parser {
 		method finalize(Proc::Status $exit-status) {
 			return Result.new(:$tests-planned, :$tests-run, :$passed, :$failed, :@errors, :$exit-status);
 		}
-		method !add_error(Str $error) {
+		method !add-error(Str $error) {
 			push @!errors, $error;
 		}
 	}
