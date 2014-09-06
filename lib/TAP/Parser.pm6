@@ -88,6 +88,9 @@ class TAP::Parser {
 	class Comment does Entry {
 		has Str $.comment = !!! 'comment is required';
 	}
+	class YAML does Entry {
+		has Str $.content;
+	}
 	class Unknown does Entry {
 	}
 
@@ -190,7 +193,7 @@ class TAP::Parser {
 		token TOP { ^ <line>+ $ }
 		token ws { <[\s] - [\n]> }
 		token line {
-			^^ [ <plan> | <test> | <bailout> | <version> | <comment> || <unknown> ] \n
+			^^ [ <plan> | <test> | <bailout> | <version> | <comment> | <yaml> || <unknown> ] \n
 		}
 		token plan {
 			'1..' $<count>=[\d+] [ '#' <ws>* $<directive>=[:i 'SKIP'] \S+ <ws>+ $<explanation>=[\N*] ]?
@@ -209,6 +212,17 @@ class TAP::Parser {
 		}
 		token comment {
 			'#' <ws>* $<comment>=[\N+]
+		}
+		token yaml-line {
+			^^ <!yaml-end> \N*
+		}
+		token yaml-end {
+			^^ <ws>+ '...'
+		}
+		token yaml {
+			$<indent>=[<ws>+] '---' \n
+			$<content>=[ <yaml-line> \n ]+
+			<yaml-end>
 		}
 		token unknown {
 			\N+
@@ -235,6 +249,11 @@ class TAP::Parser {
 		}
 		method comment($/) {
 			make Comment.new(:raw($/.Str), :comment($<comment>.Str));
+		}
+		method yaml($/) {
+			my $indent = $<indent>.Str;
+			my $content = $/<content>.Str.subst(/ ^^ <$indent>/, '', :g);
+			make YAML.new(:raw($/.Str), :$content);
 		}
 		method unknown($/) {
 			make Unknown.new(:raw($/.Str));
