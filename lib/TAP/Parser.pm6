@@ -164,8 +164,12 @@ class TAP::Parser {
 						$!.done.break($result);
 					}
 				}
+				when Comment {
+				}
 				default {
-					...;
+					if $!seen-plan == After {
+						self!add-error("Got line {$/.Str} after late plan");
+					}
 				}
 			}
 			$!seen-lines++;
