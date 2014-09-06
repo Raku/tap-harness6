@@ -15,10 +15,15 @@ class TAP::Parser {
 	has Lexer $!lexer;
 	has Promise $.done;
 
-	submethod BUILD(Str :$!name, Source :$!source) {
-		$!state = State.new();
+	submethod BUILD(Str :$!name, Source :$!source, Promise :$bailout = Promise) {
+		$!state = State.new(:$bailout);
 		$!lexer = Lexer.new(:input($!source.input), :$!state);
 		$!done = Promise.allof($!state.done, $!source.done);
+	}
+
+	method kill() {
+		$!source.kill();
+		$!done.break("killed") if not $!done;
 	}
 
 	class Source::Proc does Source {
@@ -101,6 +106,7 @@ class TAP::Parser {
 		has Int $failed = 0;
 		has Str @!errors;
 
+		has Promise $.bailout;
 		has Int $!seen-anything = 0;
 		has Bool $!seen-plan = False;
 		has Promise $.done = Promise.new;
@@ -123,6 +129,14 @@ class TAP::Parser {
 						self!add_error("Tests out of sequence.  Found ($found-number) but expected ($expected-number)");
 					}
 					($result.is_ok ?? $!passed !! $!failed)++;
+				}
+				when Bailout {
+					if $!bailout.defined {
+						$!bailout.keep($result);
+					}
+					else {
+						$!.done.break($result);
+					}
 				}
 				default {
 					...;
