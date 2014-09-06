@@ -3,6 +3,7 @@ class TAP::Parser {
 		method input() {...}
 		method done() {...}
 		method kill() { }
+		method exit-status { Nil }
 	}
 
 	class State { ... }
@@ -30,6 +31,10 @@ class TAP::Parser {
 		}
 		method kill {
 			$!process.kill;
+		}
+		method exit-status {
+			return if not $!done;
+			return $!done.result;
 		}
 	}
 	class Source::File does Source {
