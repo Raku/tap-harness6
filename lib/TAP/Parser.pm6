@@ -106,15 +106,17 @@ class TAP::Parser {
 	}
 
 	class State {
-		has Int $tests-planned;
-		has Int $tests-run = 0;
-		has Int $passed = 0;
-		has Int $failed = 0;
+		has Range $.allowed-versions = 12 .. 13;
+		has Int $!tests-planned;
+		has Int $!tests-run = 0;
+		has Int $!passed = 0;
+		has Int $!failed = 0;
 		has Str @!errors;
 
 		has Promise $.bailout;
-		has Int $!seen-anything = 0;
-		has Bool $!seen-plan = False;
+		has Int $!seen-lines = 0;
+		enum Seen <Unseen Before After>;
+		has Seen $!seen-plan = Unseen;
 		has Promise $.done = Promise.new;
 		has Int $!version;
 
@@ -137,7 +139,7 @@ class TAP::Parser {
 					}
 					else {
 						$!tests-planned = $result.tests;
-						$!seen-plan = True;
+						$!seen-plan = $!tests-run ?? After !! Before;
 					}
 				}
 				when Test {
@@ -145,6 +147,9 @@ class TAP::Parser {
 					my $expected-number = ++$!tests-run;
 					if $found-number.defined && ($found-number != $expected-number) {
 						self!add-error("Tests out of sequence.  Found ($found-number) but expected ($expected-number)");
+					}
+					if $!seen-plan == After {
+						self!add-error("Plan must be at the beginning or end of the TAP output");
 					}
 					($result.is-ok ?? $!passed !! $!failed)++;
 				}
@@ -160,7 +165,7 @@ class TAP::Parser {
 					...;
 				}
 			}
-			$!seen-anything++;
+			$!seen-lines++;
 		}
 		method end-input() {
 			if !$!seen-plan {
@@ -174,7 +179,7 @@ class TAP::Parser {
 			$!done.keep(True);
 		}
 		method finalize(Proc::Status $exit-status) {
-			return Result.new(:$tests-planned, :$tests-run, :$passed, :$failed, :@errors, :$exit-status);
+			return Result.new(:$!tests-planned, :$!tests-run, :$!passed, :$!failed, :@!errors, :$exit-status);
 		}
 		method !add-error(Str $error) {
 			push @!errors, $error;
