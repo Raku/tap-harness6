@@ -196,7 +196,7 @@ class TAP::Parser {
 			'1..' $<count>=[\d+] [ '#' <ws>* $<directive>=[:i 'SKIP'] \S+ <ws>+ $<explanation>=[\N*] ]?
 		}
 		token test {
-			$<nok>=['not '?] 'ok' [ <ws> $<num>=[\d] ] ' -'?
+			$<nok>=['not '?] 'ok' [ <ws> $<num>=[\d] ]? ' -'?
 				[ <ws>+ $<description>=[<-[\n\#]>+] ]?
 				[ <ws>* '#' <ws>* $<directive>=[:i [ 'SKIP' | 'TODO'] \S* ] <ws>+ $<explanation>=[\N*] ]?
 				<ws>*
@@ -225,7 +225,7 @@ class TAP::Parser {
 			make Plan.new(:raw($/.Str), :tests($<count>.Int), | %( $/.kv.map( * => ~* )));
 		}
 		method test($/) {
-			make Test.new(:raw($/.Str), :ok(!$<nok>.Str), :number($<num>.Int), | %( $/.kv.map( * => ~* )));
+			make Test.new(:raw($/.Str), :ok(!$<nok>.Str), :number($<num>.defined ?? $<num>.Int !! Int), | %( $/.kv.map( * => ~* )));
 		}
 		method bailout($/) {
 			make Bailout.new(:raw($/.Str), | %( $/.kv.map( * => ~* )));
