@@ -3,7 +3,7 @@ class TAP::Parser {
 		method input() {...}
 		method done() {...}
 		method kill() { }
-		method exit-status { Nil }
+		method exit-status { Proc::Status }
 	}
 
 	class State { ... }
@@ -33,8 +33,7 @@ class TAP::Parser {
 			$!process.kill;
 		}
 		method exit-status {
-			return if not $!done;
-			return $!done.result;
+			return $!done ?? $!done.result !! nextsame;
 		}
 	}
 	class Source::File does Source {
@@ -80,14 +79,29 @@ class TAP::Parser {
 	class Unknown does Entry {
 	}
 
-	class State {
+	class Result {
 		has Int $.tests-planned;
+		has Int $.tests-run;
+		has Int $.passed;
+		has Int $.failed;
+		has Str @.warnings;
+		has Proc::Status $.exit-status;
+	}
+
+	has Result $!result;
+	method result {
+		return $!done ?? $!result //= $!state.finalize($!source.exit-status) !! Nil;
+	}
+
+	class State {
+		has Int $tests-planned;
+		has Int $tests-run = 0;
+		has Int $passed = 0;
+		has Int $failed = 0;
+		has Str @warnings;
+
 		has Int $!seen-anything = 0;
 		has Bool $!seen-plan = False;
-		has Int $!tests-run = 0;
-		has Int $.passed = 0;
-		has Int $.failed = 0;
-		has Str @.warnings;
 		has Promise $.done = Promise.new;
 
 		method handle_result(Entry $result) {
@@ -115,7 +129,7 @@ class TAP::Parser {
 			}
 			$!seen-anything++;
 		}
-		method finalize() {
+		method end-input() {
 			if !$!seen-plan {
 				self!add_warning('No plan found in TAP output');
 				if $!tests-run != ($!tests-planned || 0) {
@@ -125,6 +139,9 @@ class TAP::Parser {
 				}
 			}
 			$!done.keep(True);
+		}
+		method finalize(Proc::Status $exit-status) {
+			return Result.new(:$tests-planned, :$tests-run, :$passed, :$failed, :@warnings, :$exit-status);
 		}
 		method !add_warning($warning) {
 			push @!warnings, $warning;
@@ -206,7 +223,7 @@ class TAP::Parser {
 			:done({
 				if !$done {
 					$done = True;
-					$state.finalize();
+					$state.end-input();
 				}
 			}));
 		}

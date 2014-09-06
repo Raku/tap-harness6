@@ -18,7 +18,7 @@ class TAP::Harness {
 	has Any @.sources;
 
 	method run(:$parallel = 2) {
-		my (@working, @parsed);
+		my (@working, @results);
 		return start {
 			for @!sources -> $source-name {
 				my $source = @!handlers.max(*.can_handle($source-name)).make_source($source-name);
@@ -29,10 +29,10 @@ class TAP::Harness {
 			}
 			await Promise.allof(@working.map(*.done));
 			reap-finished();
-			@parsed;
+			@results;
 		};
 		sub reap-finished() {
-			@parsed.push(@working.grep(*));
+			@results.push(@working.grep(*).map(*.result));
 			@working .= grep(!*);
 		}
 	}
