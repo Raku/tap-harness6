@@ -9,12 +9,13 @@ class TAP::Parser {
 	class State { ... }
 	class Lexer { ... }
 
+	has Str $.name;
 	has Source $!source;
 	has State $!state;
 	has Lexer $!lexer;
 	has Promise $.done;
 
-	submethod BUILD(Source :$!source) {
+	submethod BUILD(Str :$!name, Source :$!source) {
 		$!state = State.new();
 		$!lexer = Lexer.new(:input($!source.input), :$!state);
 		$!done = Promise.allof($!state.done, $!source.done);

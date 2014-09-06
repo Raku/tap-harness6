@@ -20,9 +20,9 @@ class TAP::Harness {
 	method run(:$parallel = 2) {
 		my (@working, @results);
 		return start {
-			for @!sources -> $source-name {
-				my $source = @!handlers.max(*.can_handle($source-name)).make_source($source-name);
-				@working.push(TAP::Parser.new(:$source));
+			for @!sources -> $name {
+				my $source = @!handlers.max(*.can_handle($name)).make_source($name);
+				@working.push(TAP::Parser.new(:$name, :$source));
 				next if @working < $parallel;
 				await Promise.anyof(@working.map(*.done));
 				reap-finished();
