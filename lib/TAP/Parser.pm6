@@ -116,9 +116,21 @@ class TAP::Parser {
 		has Int $!seen-anything = 0;
 		has Bool $!seen-plan = False;
 		has Promise $.done = Promise.new;
+		has Int $!version;
 
 		method handle_result(Entry $result) {
 			given $result {
+				when Version {
+					if $!seen-lines {
+						self!add-error('Seen version declaration mid-stream');
+					}
+					elsif $result.version !~~ $!allowed-versions {
+						self!add-error("Version must be in range $!allowed-versions");
+					}
+					else {
+						$!version = $result.version;
+					}
+				}
 				when Plan {
 					if $!seen-plan {
 						self!add-error('Seen a second plan');
