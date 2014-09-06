@@ -130,7 +130,7 @@ class TAP::Parser {
 		token TOP { ^ <line>+ $ }
 		token ws { <[\s] - [\n]> }
 		token line {
-			^^ [ <plan> | <test> | <bailout> | <version> || <unknown> ] \n
+			^^ [ <plan> | <test> | <bailout> | <version> | <comment> || <unknown> ] \n
 		}
 		token plan {
 			'1..' $<count>=[\d+] [ '#' <ws>* $<directive>=['SKIP'] \S+ <ws>+ $<explanation>=[\N*] ]?
@@ -146,6 +146,9 @@ class TAP::Parser {
 		}
 		token version {
 			'TAP VERSION ' $<version>=[\d+]
+		}
+		token comment {
+			'#' <ws>* $<comment>=[\N+]
 		}
 		token unknown {
 			\N+
@@ -170,6 +173,9 @@ class TAP::Parser {
 		}
 		method version($/) {
 			make Version.new(:raw($/.Str), :version($<version>.Int));
+		}
+		method comment($/) {
+			make Comment.new(:raw($/.Str), :comment($<comment>.Str));
 		}
 		method unknown($/) {
 			make Unknown.new(:raw($/.Str));
