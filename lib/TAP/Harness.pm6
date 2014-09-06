@@ -14,10 +14,10 @@ class TAP::Harness {
 		}
 	}
 
-	has SourceHandler @!handlers = SourceHandler::Perl6.new();
+	has SourceHandler @.handlers = SourceHandler::Perl6.new();
 	has Any @.sources;
 
-	method run(:$parallel = 2) {
+	method run(Int :$parallel = 2) {
 		my (@working, @results);
 		return start {
 			for @!sources -> $name {

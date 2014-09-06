@@ -144,7 +144,7 @@ class TAP::Parser {
 		method finalize(Proc::Status $exit-status) {
 			return Result.new(:$tests-planned, :$tests-run, :$passed, :$failed, :@warnings, :$exit-status);
 		}
-		method !add_warning($warning) {
+		method !add_warning(Str $warning) {
 			push @!warnings, $warning;
 		}
 	}
@@ -178,7 +178,6 @@ class TAP::Parser {
 		}
 	}
 	class Action {
-		my $raw = '';
 		method TOP($/) {
 			make [ $/<line>.map(*.ast) ];
 		}
