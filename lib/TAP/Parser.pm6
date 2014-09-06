@@ -8,16 +8,21 @@ class TAP::Parser {
 
 	class State { ... }
 	class Lexer { ... }
+	role Session { ... };
 
 	has Str $.name;
 	has Source $!source;
 	has State $!state;
 	has Lexer $!lexer;
 	has Promise $.done;
+	has Session $!session;
 
-	submethod BUILD(Str :$!name, Source :$!source, Promise :$bailout = Promise) {
+	submethod BUILD(Str :$!name, Source :$!source, :$!session = Session, Promise :$bailout = Promise) {
+		my $entries = Supply.new;
 		$!state = State.new(:$bailout);
-		$!lexer = Lexer.new(:input($!source.input), :$!state);
+		$entries.tap(-> $entry { $!state.handle_result($entry) }, :done(-> { $!state.end-input() }));
+		$entries.tap(-> $entry { $!session.handle_result($entry) }) if $!session;
+		$!lexer = Lexer.new(:input($!source.input), :output($entries));
 		$!done = Promise.allof($!state.done, $!source.done);
 	}
 
@@ -266,10 +271,11 @@ class TAP::Parser {
 	}
 
 	class Lexer {
-		has $!input;
-		has $!grammar = Grammar.new;
-		has $!actions = Action.new;
-		submethod BUILD(Supply:D :$!input, State :$state) {
+		has Supply $!input;
+		has Supply $!output;
+		has Grammar $!grammar = Grammar.new;
+		has Action $!actions = Action.new;
+		submethod BUILD(Supply:D :$!input, Supply:D :$!output) {
 			my $buffer = '';
 			my $done = False;
 			$!input.act(-> $data {
@@ -277,14 +283,14 @@ class TAP::Parser {
 				while ($!grammar.subparse($buffer, :actions($!actions))) -> $match {
 					$buffer.=substr($match.to);
 					for @($match.made) -> $result {
-						$state.handle_result($result);
+						$!output.more($result);
 					}
 				}
 			},
 			:done({
 				if !$done {
 					$done = True;
-					$state.end-input();
+					$!output.done();
 				}
 			}));
 		}
