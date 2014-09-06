@@ -128,19 +128,21 @@ class TAP::Parser {
 
 	grammar Grammar {
 		token TOP { ^ <line>+ $ }
+		token ws { <[\s] - [\n]> }
 		token line {
 			^^ [ <plan> | <test> | <bailout> | <version> || <unknown> ] \n
 		}
 		token plan {
-			'1..' $<count>=[\d+] [ '#' \s* $<directive>=['SKIP'] \S+ \s+ $<explanation>=[\N*] ]?
+			'1..' $<count>=[\d+] [ '#' <ws>* $<directive>=['SKIP'] \S+ <ws>+ $<explanation>=[\N*] ]?
 		}
 		token test {
-			$<nok>=['not '?] 'ok' \s* $<num>=[\d] ' -'?
-				[ \s+ $<description>=[<-[\n\#]>*] ]?
-				[ \s* '#' \s* $<directive>=['SKIP' | 'TODO'] \s+ $<explanation>=[\N*] ]?
+			$<nok>=['not '?] 'ok' [ <ws> $<num>=[\d] ] ' -'?
+				[ <ws>+ $<description>=[<-[\n\#]>+] ]?
+				[ <ws>* '#' <ws>* $<directive>=['SKIP' \S* | 'TODO'] <ws>+ $<explanation>=[\N*] ]?
+				<ws>*
 		}
 		token bailout {
-			'Bail out!' [ ' ' $<explanation>=[\N*] ]?
+			'Bail out!' [ <ws> $<explanation>=[\N*] ]?
 		}
 		token version {
 			'TAP VERSION ' $<version>=[\d+]
