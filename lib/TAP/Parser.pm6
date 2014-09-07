@@ -20,8 +20,8 @@ class TAP::Parser {
 	submethod BUILD(Str :$!name, Source :$!source, :$!session = Session, Promise :$bailout = Promise) {
 		my $entries = Supply.new;
 		$!state = State.new(:$bailout);
-		$entries.tap(-> $entry { $!state.handle_result($entry) }, :done(-> { $!state.end-input() }));
-		$entries.tap(-> $entry { $!session.handle_result($entry) }) if $!session;
+		$entries.tap(-> $entry { $!state.handle-entry($entry) }, :done(-> { $!state.end-input() }));
+		$entries.tap(-> $entry { $!session.handle-entry($entry) }) if $!session;
 		$!lexer = Lexer.new(:input($!source.input), :output($entries));
 		$!done = Promise.allof($!state.done, $!source.done);
 	}
@@ -129,17 +129,17 @@ class TAP::Parser {
 		has Promise $.done = Promise.new;
 		has Int $!version;
 
-		method handle_result(Entry $result) {
-			given $result {
+		method handle-entry(Entry $entry) {
+			given $entry {
 				when Version {
 					if $!seen-lines {
 						self!add-error('Seen version declaration mid-stream');
 					}
-					elsif $result.version !~~ $!allowed-versions {
+					elsif $entry.version !~~ $!allowed-versions {
 						self!add-error("Version must be in range $!allowed-versions");
 					}
 					else {
-						$!version = $result.version;
+						$!version = $entry.version;
 					}
 				}
 				when Plan {
@@ -147,12 +147,12 @@ class TAP::Parser {
 						self!add-error('Seen a second plan');
 					}
 					else {
-						$!tests-planned = $result.tests;
+						$!tests-planned = $entry.tests;
 						$!seen-plan = $!tests-run ?? After !! Before;
 					}
 				}
 				when Test {
-					my $found-number = $result.number;
+					my $found-number = $entry.number;
 					my $expected-number = ++$!tests-run;
 					if $found-number.defined && ($found-number != $expected-number) {
 						self!add-error("Tests out of sequence.  Found ($found-number) but expected ($expected-number)");
@@ -160,14 +160,14 @@ class TAP::Parser {
 					if $!seen-plan == After {
 						self!add-error("Plan must be at the beginning or end of the TAP output");
 					}
-					($result.is-ok ?? $!passed !! $!failed)++;
+					($entry.is-ok ?? $!passed !! $!failed)++;
 				}
 				when Bailout {
 					if $!bailout.defined {
-						$!bailout.keep($result);
+						$!bailout.keep($entry);
 					}
 					else {
-						$!.done.break($result);
+						$!.done.break($entry);
 					}
 				}
 				when Comment {
