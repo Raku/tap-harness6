@@ -29,8 +29,9 @@ class TAP::Harness {
 	}
 
 	method run(Int :$parallel = 2) {
-		my (@working, @results);
+		my @working;
 		my $kill = Promise.new;
+		my $aggregator = TAP::Parser::Aggregator.new();
 		my $done = start {
 			for @!sources -> $name {
 				last if $kill;
@@ -45,11 +46,19 @@ class TAP::Harness {
 			if ($kill) {
 				.kill for @working;
 			}
-			@results;
+			$aggregator;
 		};
 		sub reap-finished() {
-			@results.push(@working.grep(*).map(*.result));
-			@working .= grep(!*);
+			my @new-working;
+			for @working -> $current {
+				if $current.done {
+					$aggregator.add-result($current.result);
+				}
+				else {
+					@new-working.push($current);
+				}
+			}
+			@working = @new-working;
 		}
 		return Run.new(:$done, :$kill);
 	}
