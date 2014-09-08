@@ -24,7 +24,7 @@ package TAP {
 			:i 'TAP version ' $<version>=[\d+]
 		}
 		token comment {
-			'#' <ws>* $<comment>=[\N+]
+			'#' <ws>* $<comment>=[\N*]
 		}
 		token yaml-line {
 			^^ <!yaml-end> \N*
@@ -34,7 +34,7 @@ package TAP {
 		}
 		token yaml {
 			$<indent>=[<ws>+] '---' \n
-			$<content>=[ <yaml-line> \n ]+
+			$<content>=[ [ <yaml-line> \n ]+ ]
 			<yaml-end>
 		}
 		token unknown {
