@@ -39,6 +39,7 @@ package TAP {
 			has TAP::Plan $!plan;
 			has Int $!last-updated = 0;
 			has Str $!planstr = '/?';
+			has Int $!number = 0;
 			method handle-entry(TAP::Entry $entry) {
 				#$.formatter.output($entry.perl ~ "\n");
 				given $entry {
@@ -49,11 +50,10 @@ package TAP {
 						$!planstr = '/' ~ $entry.tests;
 					}
 					when TAP::Test {
-						my $number = $entry.number;
 						my $now = time;
 						if $!last-updated != $now {
 							$!last-updated = $now;
-							$!formatter.output(("\r", $!pretty, $number, $!planstr).join(''));
+							$!formatter.output(("\r", $!pretty, ++$!number, $!planstr).join(''));
 						}
 					}
 					when TAP::Comment {
