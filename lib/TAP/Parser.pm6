@@ -71,7 +71,7 @@ package TAP::Parser {
 			}
 			$!seen-lines++;
 		}
-		method end-input() {
+		method end-entries() {
 			if !$!seen-plan {
 				self!add-error('No plan found in TAP output');
 				if $!tests-run != ($!tests-planned || 0) {
@@ -107,9 +107,8 @@ package TAP::Parser {
 		submethod BUILD(Str :$!name, Source :$!source, :$!session = TAP::Session, TAP::Entry::Handler :@handlers = Array[TAP::Entry::Handler].new, Promise :$bailout = Promise) {
 			my $entries = Supply.new;
 			$!state = State.new(:$bailout);
-			$entries.tap(-> $entry { $!state.handle-entry($entry) }, :done(-> { $!state.end-input() }));
-			for ($!session, @handlers) -> $handler {
-				$entries.tap(-> $entry { $handler.handle-entry($entry) }) if $handler.defined;
+			for ($!state, $!session, @handlers).grep(*.defined) -> $handler {
+				$entries.tap(-> $entry { $handler.handle-entry($entry) }, :done(-> {$handler.end-entries}));
 			}
 
 			$!source.start($entries);

@@ -67,11 +67,27 @@ package TAP {
 	}
 
 	role Entry::Handler {
-		method handle-entry { ... }
+		method handle-entry(Entry) { ... }
+		method end-entries() { }
 	}
 
 	role Session does Entry::Handler {
 		has Str $.name;
-		method close-test { ... }
+		method close-test() { ... }
+	}
+
+	class Output does Entry::Handler {
+		has IO::Handle $.handle = $*OUT;
+		method handle-entry(Entry $entry) {
+			$!handle.say($entry.Str);
+		}
+		method end-entries() {
+			$!handle.flush;
+		}
+		method open(Str $filename) {
+			my $handle = open $filename, :w;
+			$handle.autoflush(True);
+			return Output.new(:$handle);
+		}
 	}
 }
