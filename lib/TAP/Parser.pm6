@@ -1,8 +1,9 @@
 use TAP::Lexer;
+use TAP::Entry;
+use TAP::Result;
 
 package TAP::Parser {
 	class State { ... }
-	role Session { ... }
 
 	class Async {
 		role Source {
@@ -17,9 +18,9 @@ package TAP::Parser {
 		has State $!state;
 		has TAP::Lexer $!lexer;
 		has Promise $.done;
-		has Session $.session;
+		has TAP::Session $.session;
 
-		submethod BUILD(Str :$!name, Source :$!source, :$!session = Session, Promise :$bailout = Promise) {
+		submethod BUILD(Str :$!name, Source :$!source, :$!session = TAP::Session, Promise :$bailout = Promise) {
 			my $entries = Supply.new;
 			$!state = State.new(:$bailout);
 			$entries.tap(-> $entry { $!state.handle-entry($entry) }, :done(-> { $!state.end-input() }));
@@ -70,10 +71,7 @@ package TAP::Parser {
 		}
 	}
 
-	use TAP::Result;
-	use TAP::Entry;
-
-	class State {
+	class State does TAP::Entry::Handler {
 		has Range $.allowed-versions = 12 .. 13;
 		has Int $!tests-planned;
 		has Int $!tests-run = 0;
@@ -158,12 +156,5 @@ package TAP::Parser {
 		method !add-error(Str $error) {
 			push @!errors, $error;
 		}
-	}
-
-	role Session {
-		has Str $.name;
-		method handle-entry { ... }
-		method close-test { ... }
-		method output-test-failure { ... }
 	}
 }

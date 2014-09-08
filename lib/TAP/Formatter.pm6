@@ -1,4 +1,4 @@
-use TAP::Parser;
+use TAP::Entry;
 use TAP::Result;
 
 package TAP {
@@ -32,73 +32,73 @@ package TAP {
 		}
 	}
 
-	class Session::Console does TAP::Parser::Session {
-		has TAP::Formatter $.formatter;
-		has Str $!pretty = $!formatter.format_name($!name);
-		has TAP::Plan $!plan;
-		has Int $!last-updated = 0;
-		has Str $!planstr = '/?';
-		method handle-entry(TAP::Entry $entry) {
-			#$.formatter.output($entry.perl ~ "\n");
-			given $entry {
-				when TAP::Bailout {
-				}
-				when TAP::Plan {
-					$!plan = $entry;
-					$!planstr = '/' ~ $entry.tests;
-				}
-				when TAP::Test {
-					my $number = $entry.number;
-					my $now = time;
-					if $!last-updated != $now {
-						$!last-updated = $now;
-						$!formatter.output(("\r", $!pretty, $number, $!planstr).join(''));
+	class Formatter::Console does Formatter {
+		class Session does TAP::Session {
+			has TAP::Formatter $.formatter;
+			has Str $!pretty = $!formatter.format_name($!name);
+			has TAP::Plan $!plan;
+			has Int $!last-updated = 0;
+			has Str $!planstr = '/?';
+			method handle-entry(TAP::Entry $entry) {
+				#$.formatter.output($entry.perl ~ "\n");
+				given $entry {
+					when TAP::Bailout {
+					}
+					when TAP::Plan {
+						$!plan = $entry;
+						$!planstr = '/' ~ $entry.tests;
+					}
+					when TAP::Test {
+						my $number = $entry.number;
+						my $now = time;
+						if $!last-updated != $now {
+							$!last-updated = $now;
+							$!formatter.output(("\r", $!pretty, $number, $!planstr).join(''));
+						}
+					}
+					when TAP::Comment {
 					}
 				}
-				when TAP::Comment {
+			}
+			method output-test-failure(TAP::Result $result) {
+				$.formatter.output("\r$!pretty failed {$result.failed} tests\n");
+			}
+			method clear-for-close(TAP::Result $result) {
+				my $length = ($!pretty ~ $!planstr ~ $result.tests-run).chars + 1;
+				$!formatter.output("\r" ~ (' ' x $length));
+			}
+
+			method close-test(TAP::Result $result) {
+				self.clear-for-close($result);
+				if ($result.skip-all) {
+					$!formatter.output("\r$!pretty skipped");
+				}
+				elsif ($result.failed == 0) {
+					$!formatter.output("\r$!pretty ok\n");
+				}
+				else {
+					self.output-rest-failure($result);
 				}
 			}
 		}
-		method output-test-failure(TAP::Result $result) {
-			$.formatter.output("\r$!pretty failed {$result.failed} tests\n");
-		}
-		method clear-for-close(TAP::Result $result) {
-			my $length = ($!pretty ~ $!planstr ~ $result.tests-run).chars + 1;
-			$!formatter.output("\r" ~ (' ' x $length));
+		class Session::Parallel is Session {
+			method handle-entry(TAP::Entry $entry) {
+				nextsame;
+			}
+			method close-test(TAP::Result $result) {
+				nextsame;
+			}
+			method clear-for-close(TAP::Result $result) {
+				nextsame;
+			}
 		}
 
-		method close-test(TAP::Result $result) {
-			self.clear-for-close($result);
-			if ($result.skip-all) {
-				$!formatter.output("\r$!pretty skipped");
-			}
-			elsif ($result.failed == 0) {
-				$!formatter.output("\r$!pretty ok\n");
-			}
-			else {
-				self.output-rest-failure($result);
-			}
-		}
-	}
-	class Session::Console::Parallel is Session::Console {
-		method handle-entry(TAP::Entry $entry) {
-			nextsame;
-		}
-		method close-test(TAP::Result $result) {
-			nextsame;
-		}
-		method clear-for-close(TAP::Result $result) {
-			nextsame;
-		}
-	}
-
-	class Formatter::Console does Formatter {
 		has IO::Handle $.handle = $*OUT;
 		method output(Any $value) {
 			$.handle.print($value);
 		}
 		method open-test(Str $name) {
-			my $session-class = $!parallel ?? Session::Console::Parallel !! Session::Console;
+			my $session-class = $.parallel ?? Session::Parallel !! Session;
 			return $session-class.new(:$name, :formatter(self));
 		}
 	}

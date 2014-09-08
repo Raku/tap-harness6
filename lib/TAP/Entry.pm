@@ -38,4 +38,13 @@ package TAP {
 	}
 	class Unknown does Entry {
 	}
+
+	role Entry::Handler {
+		method handle-entry { ... }
+	}
+
+	role Session does Entry::Handler {
+		has Str $.name;
+		method close-test { ... }
+	}
 }
