@@ -1,65 +1,73 @@
-class TAP::Parser {
-	role Source {
-		method input() {...}
-		method done() {...}
-		method kill() { }
-		method exit-status { Proc::Status }
-	}
-
+package TAP::Parser {
 	class State { ... }
 	class Lexer { ... }
+	class Result { ... }
 	role Session { ... }
 
-	has Str $.name;
-	has Source $!source;
-	has State $!state;
-	has Lexer $!lexer;
-	has Promise $.done;
-	has Session $.session;
+	class Async {
+		role Source {
+			method input() {...}
+			method done() {...}
+			method kill() { }
+			method exit-status { Proc::Status }
+		}
 
-	submethod BUILD(Str :$!name, Source :$!source, :$!session = Session, Promise :$bailout = Promise) {
-		my $entries = Supply.new;
-		$!state = State.new(:$bailout);
-		$entries.tap(-> $entry { $!state.handle-entry($entry) }, :done(-> { $!state.end-input() }));
-		$entries.tap(-> $entry { $!session.handle-entry($entry) }) if $!session;
-
-		$!lexer = Lexer.new(:output($entries));
-		my $done = False;
-		$!source.input.act(-> $data { $!lexer.add-data($data) }, :done({ $entries.done() if !$done++; }));
-		$!done = Promise.allof($!state.done, $!source.done);
-	}
-
-	method kill() {
-		$!source.kill();
-		$!done.break("killed") if not $!done;
-	}
-
-	class Source::Proc does Source {
-		has Proc::Async $!process;
-		has Supply $.input;
+		has Str $.name;
+		has Source $!source;
+		has State $!state;
+		has Lexer $!lexer;
 		has Promise $.done;
-		submethod BUILD(:$path, :$args) {
-			$!process = Proc::Async.new(:$path, :$args);
-			$!input = $!process.stdout_chars();
-			$!done = $!process.start();
+		has Session $.session;
+
+		submethod BUILD(Str :$!name, Source :$!source, :$!session = Session, Promise :$bailout = Promise) {
+			my $entries = Supply.new;
+			$!state = State.new(:$bailout);
+			$entries.tap(-> $entry { $!state.handle-entry($entry) }, :done(-> { $!state.end-input() }));
+			$entries.tap(-> $entry { $!session.handle-entry($entry) }) if $!session;
+
+			$!lexer = Lexer.new(:output($entries));
+			my $done = False;
+			$!source.input.act(-> $data { $!lexer.add-data($data) }, :done({ $entries.done() if !$done++; }));
+			$!done = Promise.allof($!state.done, $!source.done);
 		}
-		method kill {
-			$!process.kill;
+
+		method kill() {
+			$!source.kill();
+			$!done.break("killed") if not $!done;
 		}
-		method exit-status {
-			return $!done ?? $!done.result !! nextsame;
+
+		has Result $!result;
+		method result {
+			return $!done ?? $!result //= $!state.finalize($!name, $!source.exit-status) !! Nil;
 		}
-	}
-	class Source::File does Source {
-		has Str $.filename;
-		has Supply $.input = Supply.new;
-		has Thread $.done = start {
-			my $fh = open $!filename, :r;
-			for $fh.lines -> $line {
-				$!input.more($line);
+
+		class Source::Proc does Source {
+			has Proc::Async $!process;
+			has Supply $.input;
+			has Promise $.done;
+			submethod BUILD(:$path, :$args) {
+				$!process = Proc::Async.new(:$path, :$args);
+				$!input = $!process.stdout_chars();
+				$!done = $!process.start();
 			}
-			$!input.done();
-		};
+			method kill {
+				$!process.kill;
+			}
+			method exit-status {
+				return $!done ?? $!done.result !! nextsame;
+			}
+		}
+		class Source::File does Source {
+			has Str $.filename;
+			has Supply $.input = Supply.new;
+			has Thread $.done = start {
+				my $fh = open $!filename, :r;
+				for $fh.lines -> $line {
+					$!input.more($line);
+				}
+				$!input.done();
+			};
+		}
 	}
 
 	use TAP::Entry;
@@ -73,11 +81,6 @@ class TAP::Parser {
 		has Str @.errors;
 		has Bool $.skip-all;
 		has Proc::Status $.exit-status;
-	}
-
-	has Result $!result;
-	method result {
-		return $!done ?? $!result //= $!state.finalize($!name, $!source.exit-status) !! Nil;
 	}
 
 	class State {
@@ -240,7 +243,8 @@ class TAP::Parser {
 
 	class Lexer {
 		has Str $!buffer = '';
-		has Supply $!output;
+		our subset Output of Any:D where *.can('more');
+		has Output $!output;
 		has Grammar $!grammar = Grammar.new;
 		has Action $!actions = Action.new;
 		submethod BUILD(Supply:D :$!output) { }

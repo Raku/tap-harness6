@@ -3,15 +3,15 @@ use TAP::Formatter;
 
 class TAP::Harness {
 	role SourceHandler {
-		method can_handle {...};
-		method make_source {...};
+		method can-handle {...};
+		method make-async-source {...};
 	}
 	class SourceHandler::Perl6 does SourceHandler {
-		method can_handle($filename) {
-			return 1;
+		method can-handle($filename) {
+			return True;
 		}
-		method make_source($filename) {
-			return TAP::Parser::Source::Proc.new(:path($*EXECUTABLE), :args([$filename]));
+		method make-async-source($filename) {
+			return TAP::Parser::Async::Source::Proc.new(:path($*EXECUTABLE), :args([$filename]));
 		}
 	}
 
@@ -37,14 +37,14 @@ class TAP::Harness {
 		my $done = start {
 			for @!sources -> $name {
 				last if $kill;
-				my $source = @!handlers.max(*.can_handle($name)).make_source($name);
+				my $source = @!handlers.max(*.can-handle($name)).make-async-source($name);
 				my $session = $formatter.open-test($name);
-				@working.push(TAP::Parser.new(:$name, :$source, :$session, :$kill));
+				@working.push(TAP::Parser::Async.new(:$name, :$source, :$session, :$kill));
 				next if @working < $parallel;
 				await Promise.anyof(@working.map(*.done), $kill);
 				reap-finished();
 			}
-			await Promise.anyof(Promise.allof(@working.map(*.done)), $kill) if not $kill;
+			await Promise.anyof(Promise.allof(@working.map(*.done)), $kill) if @working && not $kill;
 			reap-finished();
 			if ($kill) {
 				.kill for @working;
