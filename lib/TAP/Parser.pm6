@@ -64,10 +64,7 @@ package TAP::Parser {
 			has Str $.filename;
 			has Supply $.input = Supply.new;
 			has Thread $.done = start {
-				my $fh = open $!filename, :r;
-				for $fh.lines -> $line {
-					$!input.more($line);
-				}
+				$!input.more($!filename.IO.slurp);
 				$!input.done();
 			};
 		}
