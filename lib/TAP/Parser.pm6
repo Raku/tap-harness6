@@ -20,11 +20,13 @@ package TAP::Parser {
 		has Promise $.done;
 		has TAP::Session $.session;
 
-		submethod BUILD(Str :$!name, Source :$!source, :$!session = TAP::Session, Promise :$bailout = Promise) {
+		submethod BUILD(Str :$!name, Source :$!source, :$!session = TAP::Session, TAP::Entry::Handler :@handlers = Array[TAP::Entry::Handler].new, Promise :$bailout = Promise) {
 			my $entries = Supply.new;
 			$!state = State.new(:$bailout);
 			$entries.tap(-> $entry { $!state.handle-entry($entry) }, :done(-> { $!state.end-input() }));
-			$entries.tap(-> $entry { $!session.handle-entry($entry) }) if $!session;
+			for ($!session, @handlers) -> $handler {
+				$entries.tap(-> $entry { $handler.handle-entry($entry) }) if $handler.defined;
+			}
 
 			$!lexer = TAP::Lexer.new(:output($entries));
 			my $done = False;
