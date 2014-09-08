@@ -8,14 +8,14 @@ class TAP::Parser {
 
 	class State { ... }
 	class Lexer { ... }
-	role Session { ... };
+	role Session { ... }
 
 	has Str $.name;
 	has Source $!source;
 	has State $!state;
 	has Lexer $!lexer;
 	has Promise $.done;
-	has Session $!session;
+	has Session $.session;
 
 	submethod BUILD(Str :$!name, Source :$!source, :$!session = Session, Promise :$bailout = Promise) {
 		my $entries = Supply.new;
@@ -328,5 +328,111 @@ class TAP::Parser {
 			return @!parse-order.map(*.name);
 		}
 	}
-}
 
+	role Formatter {
+		enum Volume <Silent ReallyQuiet Quiet Normal Verbose>;
+
+		has Int $.parallel;
+		has Volume $.volume;
+		has Int $!longest;
+
+		method BUILD(:$!parallel, :$!volume = Normal, :@names) {
+			$!longest = @names ?? @names.map(*.chars).max !! 12;
+		}
+		method summary(TAP::Parser::Aggregator $aggregator) {
+			my @tests = $aggregator.descriptions;
+			my $total = $aggregator.tests-run;
+			my $passed = $aggregator.passed;
+
+			if $aggregator.failed == 0 {
+				self.output-success("All tests successful.\n");
+			}
+		}
+		method output-success(Mu \output) {
+			self.output(output);
+		}
+		method output { ... }
+		method open-test { ... }
+		method format_name($name) {
+			my $periods = '.' x ( $!longest + 2 - $name.chars);
+			return "$name $periods ";
+		}
+	}
+
+	role Session {
+		has Str $.name;
+		has Formatter $.formatter;
+		has Str $!pretty = $!formatter.format_name($!name);
+		method handle-entry { ... }
+		method close-test { ... }
+		method output-test-failure(Result $result) {
+			$!formatter.output("\r$!pretty failed {$result.failed} tests\n");
+		}
+	}
+
+	class Session::Console does Session {
+		has Plan $!plan;
+		has Int $!last-updated = 0;
+		has Str $!planstr = '/?';
+		method handle-entry(Entry $entry) {
+			#$.formatter.output($entry.perl ~ "\n");
+			given $entry {
+				when Bailout {
+				}
+				when Plan {
+					$!plan = $entry;
+					$!planstr = '/' ~ $entry.tests;
+				}
+				when Test {
+					my $number = $entry.number;
+					my $now = time;
+					if $!last-updated != $now {
+						$!last-updated = $now;
+						$!formatter.output(("\r", $!pretty, $number, $!planstr).join(''));
+					}
+				}
+				when Comment {
+				}
+			}
+		}
+		method clear-for-close(Result $result) {
+			my $length = ($!pretty ~ $!planstr ~ $result.tests-run).chars + 1;
+			$!formatter.output("\r" ~ (' ' x $length));
+		}
+
+		method close-test(Result $result) {
+			self.clear-for-close($result);
+			if ($result.skip-all) {
+				$!formatter.output("\r$!pretty skipped");
+			}
+			elsif ($result.failed == 0) {
+				$!formatter.output("\r$!pretty ok\n");
+			}
+			else {
+				self.output-rest-failure($result);
+			}
+		}
+	}
+	class Session::Console::Parallel is Session::Console {
+		method handle-entry(Entry $entry) {
+			nextsame;
+		}
+		method close-test(Result $result) {
+			nextsame;
+		}
+		method clear-for-close(Result $result) {
+			nextsame;
+		}
+	}
+
+	class Formatter::Console does Formatter {
+		has IO::Handle $.handle = $*OUT;
+		method output(Any $value) {
+			$.handle.print($value);
+		}
+		method open-test(Str $name) {
+			my $session-class = $!parallel ?? Session::Console::Parallel !! Session::Console;
+			return $session-class.new(:$name, :formatter(self));
+		}
+	}
+}

@@ -16,6 +16,7 @@ class TAP::Harness {
 
 	has SourceHandler @.handlers = SourceHandler::Perl6.new();
 	has Any @.sources;
+	has TAP::Parser::Formatter:T $.formatter-class = TAP::Parser::Formatter::Console;
 
 	class Run {
 		has Promise $.done;
@@ -28,7 +29,7 @@ class TAP::Harness {
 		}
 	}
 
-	method run(Int :$parallel = 2) {
+	method run(Int :$parallel = 2, TAP::Parser::Formatter :$formatter = $!formatter-class.new(:$parallel, :names(@.sources))) {
 		my @working;
 		my $kill = Promise.new;
 		my $aggregator = TAP::Parser::Aggregator.new();
@@ -36,7 +37,8 @@ class TAP::Harness {
 			for @!sources -> $name {
 				last if $kill;
 				my $source = @!handlers.max(*.can_handle($name)).make_source($name);
-				@working.push(TAP::Parser.new(:$name, :$source, :$kill));
+				my $session = $formatter.open-test($name);
+				@working.push(TAP::Parser.new(:$name, :$source, :$session, :$kill));
 				next if @working < $parallel;
 				await Promise.anyof(@working.map(*.done), $kill);
 				reap-finished();
@@ -53,6 +55,7 @@ class TAP::Harness {
 			for @working -> $current {
 				if $current.done {
 					$aggregator.add-result($current.result);
+					$current.session.close-test($current.result);
 				}
 				else {
 					@new-working.push($current);
