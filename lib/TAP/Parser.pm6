@@ -59,45 +59,7 @@ class TAP::Parser {
 		};
 	}
 
-	role Entry {
-		has Str $.raw = !!! 'Raw input is required';
-	}
-	class Version does Entry {
-		has Int $.version;
-	}
-	class Plan does Entry {
-		has Int $.tests = !!! 'tests is required';
-		has Str $.directive;
-		has Str $.explanation;
-	}
-	class Test does Entry {
-		has Bool $.ok;
-		has Int $.number;
-		has Str $.description;
-		has Str $.directive;
-		has Str $.explanation;
-
-		method is-ok() {
-			return $!ok || $.is-todo;
-		}
-		method is-todo() {
-			return $!directive.defined && $!directive ~~ m:i/ ^ 'TODO' /;
-		}
-		method is-skipped() {
-			return $!directive.defined && $!directive ~~ m:i/ ^ 'SKIP' /;
-		}
-	}
-	class Bailout does Entry {
-		has Str $.explanation;
-	}
-	class Comment does Entry {
-		has Str $.comment = !!! 'comment is required';
-	}
-	class YAML does Entry {
-		has Str $.content;
-	}
-	class Unknown does Entry {
-	}
+	use TAP::Entry;
 
 	class Result {
 		has Str $.name;
@@ -131,9 +93,9 @@ class TAP::Parser {
 		has Promise $.done = Promise.new;
 		has Int $!version;
 
-		method handle-entry(Entry $entry) {
+		method handle-entry(TAP::Entry $entry) {
 			given $entry {
-				when Version {
+				when TAP::Version {
 					if $!seen-lines {
 						self!add-error('Seen version declaration mid-stream');
 					}
@@ -144,7 +106,7 @@ class TAP::Parser {
 						$!version = $entry.version;
 					}
 				}
-				when Plan {
+				when TAP::Plan {
 					if $!seen-plan {
 						self!add-error('Seen a second plan');
 					}
@@ -154,7 +116,7 @@ class TAP::Parser {
 						$!skip-all = ?$entry.directive;
 					}
 				}
-				when Test {
+				when TAP::Test {
 					my $found-number = $entry.number;
 					my $expected-number = ++$!tests-run;
 					if $found-number.defined && ($found-number != $expected-number) {
@@ -165,7 +127,7 @@ class TAP::Parser {
 					}
 					($entry.is-ok ?? $!passed !! $!failed)++;
 				}
-				when Bailout {
+				when TAP::Bailout {
 					if $!bailout.defined {
 						$!bailout.keep($entry);
 					}
@@ -173,7 +135,7 @@ class TAP::Parser {
 						$!.done.break($entry);
 					}
 				}
-				when Comment {
+				when TAP::Comment {
 				}
 				default {
 					if $!seen-plan == After {
@@ -249,27 +211,27 @@ class TAP::Parser {
 			make $/.values[0].ast;
 		}
 		method plan($/) {
-			make Plan.new(:raw($/.Str), :tests($<count>.Int), | %( $/.kv.map( * => ~* )));
+			make TAP::Plan.new(:raw($/.Str), :tests($<count>.Int), | %( $/.kv.map( * => ~* )));
 		}
 		method test($/) {
-			make Test.new(:raw($/.Str), :ok(!$<nok>.Str), :number($<num>.defined ?? $<num>.Int !! Int), | %( $/.kv.map( * => ~* )));
+			make TAP::Test.new(:raw($/.Str), :ok(!$<nok>.Str), :number($<num>.defined ?? $<num>.Int !! Int), | %( $/.kv.map( * => ~* )));
 		}
 		method bailout($/) {
-			make Bailout.new(:raw($/.Str), | %( $/.kv.map( * => ~* )));
+			make TAP::Bailout.new(:raw($/.Str), | %( $/.kv.map( * => ~* )));
 		}
 		method version($/) {
-			make Version.new(:raw($/.Str), :version($<version>.Int));
+			make TAP::Version.new(:raw($/.Str), :version($<version>.Int));
 		}
 		method comment($/) {
-			make Comment.new(:raw($/.Str), :comment($<comment>.Str));
+			make TAP::Comment.new(:raw($/.Str), :comment($<comment>.Str));
 		}
 		method yaml($/) {
 			my $indent = $<indent>.Str;
 			my $content = $/<content>.Str.subst(/ ^^ <$indent>/, '', :g);
-			make YAML.new(:raw($/.Str), :$content);
+			make TAP::YAML.new(:raw($/.Str), :$content);
 		}
 		method unknown($/) {
-			make Unknown.new(:raw($/.Str));
+			make TAP::Unknown.new(:raw($/.Str));
 		}
 	}
 
@@ -371,19 +333,19 @@ class TAP::Parser {
 	}
 
 	class Session::Console does Session {
-		has Plan $!plan;
+		has TAP::Plan $!plan;
 		has Int $!last-updated = 0;
 		has Str $!planstr = '/?';
-		method handle-entry(Entry $entry) {
+		method handle-entry(TAP::Entry $entry) {
 			#$.formatter.output($entry.perl ~ "\n");
 			given $entry {
-				when Bailout {
+				when TAP::Bailout {
 				}
-				when Plan {
+				when TAP::Plan {
 					$!plan = $entry;
 					$!planstr = '/' ~ $entry.tests;
 				}
-				when Test {
+				when TAP::Test {
 					my $number = $entry.number;
 					my $now = time;
 					if $!last-updated != $now {
@@ -391,7 +353,7 @@ class TAP::Parser {
 						$!formatter.output(("\r", $!pretty, $number, $!planstr).join(''));
 					}
 				}
-				when Comment {
+				when TAP::Comment {
 				}
 			}
 		}
@@ -414,7 +376,7 @@ class TAP::Parser {
 		}
 	}
 	class Session::Console::Parallel is Session::Console {
-		method handle-entry(Entry $entry) {
+		method handle-entry(TAP::Entry $entry) {
 			nextsame;
 		}
 		method close-test(Result $result) {
