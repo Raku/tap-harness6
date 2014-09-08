@@ -92,16 +92,15 @@ package TAP::Parser {
 
 	class Async {
 		role Source {
-			method input() {...}
-			method done() {...}
+			method start(Supply) { ... }
+			method done() { ... }
 			method kill() { }
-			method exit-status { Proc::Status }
+			method exit-status() { Proc::Status }
 		}
 
 		has Str $.name;
 		has Source $!source;
 		has State $!state;
-		has TAP::Lexer $!lexer;
 		has Promise $.done;
 		has TAP::Session $.session;
 
@@ -113,9 +112,7 @@ package TAP::Parser {
 				$entries.tap(-> $entry { $handler.handle-entry($entry) }) if $handler.defined;
 			}
 
-			$!lexer = TAP::Lexer.new(:output($entries));
-			my $done = False;
-			$!source.input.act(-> $data { $!lexer.add-data($data) }, :done({ $entries.done() if !$done++; }));
+			$!source.start($entries);
 			$!done = Promise.allof($!state.done, $!source.done);
 		}
 
@@ -131,15 +128,20 @@ package TAP::Parser {
 
 		class Source::Proc does Source {
 			has Proc::Async $!process;
-			has Supply $.input;
+			has Supply $!input;
 			has Promise $.done;
 			submethod BUILD(:$path, :$args) {
 				$!process = Proc::Async.new(:$path, :$args);
 				$!input = $!process.stdout_chars();
+			}
+			method start(Supply $output) {
+				my $lexer = TAP::Lexer.new(:$output);
+				my $done = False;
+				$!input.act(-> $data { $lexer.add-data($data) }, :done({ $output.done() if !$done++; }));
 				$!done = $!process.start();
 			}
-			method kill {
-				$!process.kill;
+			method kill() {
+				$!process.kill();
 			}
 			method exit-status {
 				return $!done ?? $!done.result !! nextsame;
@@ -147,11 +149,15 @@ package TAP::Parser {
 		}
 		class Source::File does Source {
 			has Str $.filename;
-			has Supply $.input = Supply.new;
-			has Thread $.done = start {
-				$!input.more($!filename.IO.slurp);
-				$!input.done();
-			};
+			has Thread $.done;
+			submethod BUILD(Str :$!filename) { }
+			method start(Supply $output) {
+				my $lexer = TAP::Lexer.new(:$output);
+				$!done = start {
+					$lexer.add-data($!filename.IO.slurp);
+					$output.done();
+				};
+			}
 		}
 	}
 }
