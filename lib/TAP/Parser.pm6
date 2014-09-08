@@ -3,73 +3,6 @@ use TAP::Entry;
 use TAP::Result;
 
 package TAP::Parser {
-	class State { ... }
-
-	class Async {
-		role Source {
-			method input() {...}
-			method done() {...}
-			method kill() { }
-			method exit-status { Proc::Status }
-		}
-
-		has Str $.name;
-		has Source $!source;
-		has State $!state;
-		has TAP::Lexer $!lexer;
-		has Promise $.done;
-		has TAP::Session $.session;
-
-		submethod BUILD(Str :$!name, Source :$!source, :$!session = TAP::Session, TAP::Entry::Handler :@handlers = Array[TAP::Entry::Handler].new, Promise :$bailout = Promise) {
-			my $entries = Supply.new;
-			$!state = State.new(:$bailout);
-			$entries.tap(-> $entry { $!state.handle-entry($entry) }, :done(-> { $!state.end-input() }));
-			for ($!session, @handlers) -> $handler {
-				$entries.tap(-> $entry { $handler.handle-entry($entry) }) if $handler.defined;
-			}
-
-			$!lexer = TAP::Lexer.new(:output($entries));
-			my $done = False;
-			$!source.input.act(-> $data { $!lexer.add-data($data) }, :done({ $entries.done() if !$done++; }));
-			$!done = Promise.allof($!state.done, $!source.done);
-		}
-
-		method kill() {
-			$!source.kill();
-			$!done.break("killed") if not $!done;
-		}
-
-		has TAP::Result $!result;
-		method result {
-			return $!done ?? $!result //= $!state.finalize($!name, $!source.exit-status) !! Nil;
-		}
-
-		class Source::Proc does Source {
-			has Proc::Async $!process;
-			has Supply $.input;
-			has Promise $.done;
-			submethod BUILD(:$path, :$args) {
-				$!process = Proc::Async.new(:$path, :$args);
-				$!input = $!process.stdout_chars();
-				$!done = $!process.start();
-			}
-			method kill {
-				$!process.kill;
-			}
-			method exit-status {
-				return $!done ?? $!done.result !! nextsame;
-			}
-		}
-		class Source::File does Source {
-			has Str $.filename;
-			has Supply $.input = Supply.new;
-			has Thread $.done = start {
-				$!input.more($!filename.IO.slurp);
-				$!input.done();
-			};
-		}
-	}
-
 	class State does TAP::Entry::Handler {
 		has Range $.allowed-versions = 12 .. 13;
 		has Int $!tests-planned;
@@ -154,6 +87,71 @@ package TAP::Parser {
 		}
 		method !add-error(Str $error) {
 			push @!errors, $error;
+		}
+	}
+
+	class Async {
+		role Source {
+			method input() {...}
+			method done() {...}
+			method kill() { }
+			method exit-status { Proc::Status }
+		}
+
+		has Str $.name;
+		has Source $!source;
+		has State $!state;
+		has TAP::Lexer $!lexer;
+		has Promise $.done;
+		has TAP::Session $.session;
+
+		submethod BUILD(Str :$!name, Source :$!source, :$!session = TAP::Session, TAP::Entry::Handler :@handlers = Array[TAP::Entry::Handler].new, Promise :$bailout = Promise) {
+			my $entries = Supply.new;
+			$!state = State.new(:$bailout);
+			$entries.tap(-> $entry { $!state.handle-entry($entry) }, :done(-> { $!state.end-input() }));
+			for ($!session, @handlers) -> $handler {
+				$entries.tap(-> $entry { $handler.handle-entry($entry) }) if $handler.defined;
+			}
+
+			$!lexer = TAP::Lexer.new(:output($entries));
+			my $done = False;
+			$!source.input.act(-> $data { $!lexer.add-data($data) }, :done({ $entries.done() if !$done++; }));
+			$!done = Promise.allof($!state.done, $!source.done);
+		}
+
+		method kill() {
+			$!source.kill();
+			$!done.break("killed") if not $!done;
+		}
+
+		has TAP::Result $!result;
+		method result {
+			return $!done ?? $!result //= $!state.finalize($!name, $!source.exit-status) !! Nil;
+		}
+
+		class Source::Proc does Source {
+			has Proc::Async $!process;
+			has Supply $.input;
+			has Promise $.done;
+			submethod BUILD(:$path, :$args) {
+				$!process = Proc::Async.new(:$path, :$args);
+				$!input = $!process.stdout_chars();
+				$!done = $!process.start();
+			}
+			method kill {
+				$!process.kill;
+			}
+			method exit-status {
+				return $!done ?? $!done.result !! nextsame;
+			}
+		}
+		class Source::File does Source {
+			has Str $.filename;
+			has Supply $.input = Supply.new;
+			has Thread $.done = start {
+				$!input.more($!filename.IO.slurp);
+				$!input.done();
+			};
 		}
 	}
 }
