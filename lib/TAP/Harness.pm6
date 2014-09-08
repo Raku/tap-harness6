@@ -33,7 +33,7 @@ class TAP::Harness {
 	method run(Int :$parallel = 2, TAP::Formatter :$formatter = $!formatter-class.new(:$parallel, :names(@.sources))) {
 		my @working;
 		my $kill = Promise.new;
-		my $aggregator = TAP::Parser::Aggregator.new();
+		my $aggregator = TAP::Aggregator.new();
 		my $done = start {
 			for @!sources -> $name {
 				last if $kill;

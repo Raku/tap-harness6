@@ -1,7 +1,6 @@
 package TAP::Parser {
 	class State { ... }
 	class Lexer { ... }
-	class Result { ... }
 	role Session { ... }
 
 	class Async {
@@ -36,7 +35,7 @@ package TAP::Parser {
 			$!done.break("killed") if not $!done;
 		}
 
-		has Result $!result;
+		has TAP::Result $!result;
 		method result {
 			return $!done ?? $!result //= $!state.finalize($!name, $!source.exit-status) !! Nil;
 		}
@@ -70,18 +69,8 @@ package TAP::Parser {
 		}
 	}
 
+	use TAP::Result;
 	use TAP::Entry;
-
-	class Result {
-		has Str $.name;
-		has Int $.tests-planned;
-		has Int $.tests-run;
-		has Int $.passed;
-		has Int $.failed;
-		has Str @.errors;
-		has Bool $.skip-all;
-		has Proc::Status $.exit-status;
-	}
 
 	class State {
 		has Range $.allowed-versions = 12 .. 13;
@@ -163,7 +152,7 @@ package TAP::Parser {
 			$!done.keep(True);
 		}
 		method finalize(Str $name, Proc::Status $exit-status) {
-			return Result.new(:$name, :$!tests-planned, :$!tests-run, :$!passed, :$!failed, :@!errors, :$!skip-all, :$exit-status);
+			return TAP::Result.new(:$name, :$!tests-planned, :$!tests-run, :$!passed, :$!failed, :@!errors, :$!skip-all, :$exit-status);
 		}
 		method !add-error(Str $error) {
 			push @!errors, $error;
@@ -259,35 +248,6 @@ package TAP::Parser {
 		}
 	}
 
-	class Aggregator {
-		has Result %!results-for;
-		has Result @!parse-order;
-
-		has Int $.parsed = 0;
-		has Int $.tests-planned = 0;
-		has Int $.tests-run = 0;
-		has Int $.passed = 0;
-		has Int $.failed = 0;
-		has Str @.errors;
-
-		method add-result(Result $result) {
-			my $description = $result.name;
-			die "You already have a parser for ($description). Perhaps you have run the same test twice." if %!results-for{$description};
-			%!results-for{$description} = $result;
-			@!parse-order.push($result);
-
-			$!parsed++;
-			$!tests-planned += $result.tests-planned // 0;
-			$!tests-run += $result.tests-run;
-			$!passed += $result.passed;
-			$!failed += $result.failed;
-			@!errors.push(@($result.errors));
-		}
-
-		method descriptions {
-			return @!parse-order.map(*.name);
-		}
-	}
 
 	role Session {
 		has Str $.name;

@@ -1,4 +1,5 @@
 use TAP::Parser;
+use TAP::Result;
 
 package TAP {
 	role Formatter {
@@ -11,7 +12,7 @@ package TAP {
 		method BUILD(:$!parallel, :$!volume = Normal, :@names) {
 			$!longest = @names ?? @names.map(*.chars).max !! 12;
 		}
-		method summary(TAP::Parser::Aggregator $aggregator) {
+		method summary(TAP::Aggregator $aggregator) {
 			my @tests = $aggregator.descriptions;
 			my $total = $aggregator.tests-run;
 			my $passed = $aggregator.passed;
@@ -58,15 +59,15 @@ package TAP {
 				}
 			}
 		}
-		method output-test-failure(TAP::Parser::Result $result) {
+		method output-test-failure(TAP::Result $result) {
 			$.formatter.output("\r$!pretty failed {$result.failed} tests\n");
 		}
-		method clear-for-close(TAP::Parser::Result $result) {
+		method clear-for-close(TAP::Result $result) {
 			my $length = ($!pretty ~ $!planstr ~ $result.tests-run).chars + 1;
 			$!formatter.output("\r" ~ (' ' x $length));
 		}
 
-		method close-test(TAP::Parser::Result $result) {
+		method close-test(TAP::Result $result) {
 			self.clear-for-close($result);
 			if ($result.skip-all) {
 				$!formatter.output("\r$!pretty skipped");
@@ -83,10 +84,10 @@ package TAP {
 		method handle-entry(TAP::Entry $entry) {
 			nextsame;
 		}
-		method close-test(TAP::Parser::Result $result) {
+		method close-test(TAP::Result $result) {
 			nextsame;
 		}
-		method clear-for-close(TAP::Parser::Result $result) {
+		method clear-for-close(TAP::Result $result) {
 			nextsame;
 		}
 	}
