@@ -1,4 +1,5 @@
 use TAP::Parser;
+use TAP::Formatter;
 
 class TAP::Harness {
 	role SourceHandler {
@@ -16,7 +17,7 @@ class TAP::Harness {
 
 	has SourceHandler @.handlers = SourceHandler::Perl6.new();
 	has Any @.sources;
-	has TAP::Parser::Formatter:T $.formatter-class = TAP::Parser::Formatter::Console;
+	has TAP::Formatter:T $.formatter-class = TAP::Formatter::Console;
 
 	class Run {
 		has Promise $.done;
@@ -29,7 +30,7 @@ class TAP::Harness {
 		}
 	}
 
-	method run(Int :$parallel = 2, TAP::Parser::Formatter :$formatter = $!formatter-class.new(:$parallel, :names(@.sources))) {
+	method run(Int :$parallel = 2, TAP::Formatter :$formatter = $!formatter-class.new(:$parallel, :names(@.sources))) {
 		my @working;
 		my $kill = Promise.new;
 		my $aggregator = TAP::Parser::Aggregator.new();
