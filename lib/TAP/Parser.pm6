@@ -106,6 +106,7 @@ class TAP::Parser {
 		has Int $.passed;
 		has Int $.failed;
 		has Str @.errors;
+		has Bool $.skip-all;
 		has Proc::Status $.exit-status;
 	}
 
@@ -121,6 +122,7 @@ class TAP::Parser {
 		has Int $!passed = 0;
 		has Int $!failed = 0;
 		has Str @!errors;
+		has Bool $!skip-all = False;;
 
 		has Promise $.bailout;
 		has Int $!seen-lines = 0;
@@ -149,6 +151,7 @@ class TAP::Parser {
 					else {
 						$!tests-planned = $entry.tests;
 						$!seen-plan = $!tests-run ?? After !! Before;
+						$!skip-all = ?$entry.directive;
 					}
 				}
 				when Test {
@@ -192,7 +195,7 @@ class TAP::Parser {
 			$!done.keep(True);
 		}
 		method finalize(Str $name, Proc::Status $exit-status) {
-			return Result.new(:$name, :$!tests-planned, :$!tests-run, :$!passed, :$!failed, :@!errors, :$exit-status);
+			return Result.new(:$name, :$!tests-planned, :$!tests-run, :$!passed, :$!failed, :@!errors, :$!skip-all, :$exit-status);
 		}
 		method !add-error(Str $error) {
 			push @!errors, $error;
