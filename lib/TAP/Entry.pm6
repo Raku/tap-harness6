@@ -63,6 +63,18 @@ package TAP {
 		}
 	}
 
+	role Sub-Entry [::T = TAP::Entry] {
+		has Int $.level;
+		has ::T $.entry;
+		submethod BUILD(Int :$!level, ::T :$!entry) {
+		}
+	}
+	class Sub-Entry-Base is TAP::Unknown does Sub-Entry {
+		method to-string() {
+			return '    ' x $!level ~ $.entry;
+		}
+	}
+
 	role Entry::Handler {
 		method handle-entry(Entry) { ... }
 		method end-entries() { }
@@ -76,7 +88,7 @@ package TAP {
 	class Output does Entry::Handler {
 		has IO::Handle $.handle = $*OUT;
 		method handle-entry(Entry $entry) {
-			$!handle.say($entry.Str);
+			$!handle.say(~$entry);
 		}
 		method end-entries() {
 			$!handle.flush;
