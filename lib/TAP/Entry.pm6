@@ -84,6 +84,12 @@ package TAP {
 		has Str $.name;
 		method close-test() { ... }
 	}
+	class Session::Fake does Session {
+		method handle-entry(Entry) {
+		}
+		method close-test() {
+		}
+	}
 
 	class Output does Entry::Handler {
 		has IO::Handle $.handle = $*OUT;
