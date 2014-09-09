@@ -7,10 +7,15 @@ package TAP::Parser {
 		has Range $.allowed-versions = 12 .. 13;
 		has Int $!tests-planned;
 		has Int $!tests-run = 0;
-		has Int $!passed = 0;
-		has Int $!failed = 0;
+		has Int @!passed;
+		has Int @!failed;
 		has Str @!errors;
-		has Bool $!skip-all = False;;
+		has Int @!actual-passed;
+		has Int @!actual-failed;
+		has Int @!todo;
+		has Int @!todo-passed;
+		has Int @!skipped;
+		has Bool $!skip-all = False;
 
 		has Promise $.bailout;
 		has Int $!seen-lines = 0;
@@ -51,7 +56,12 @@ package TAP::Parser {
 					if $!seen-plan == After {
 						self!add-error("Plan must be at the beginning or end of the TAP output");
 					}
-					($entry.is-ok ?? $!passed !! $!failed)++;
+					my $usable-number = $found-number // $expected-number;
+					($entry.is-ok ?? @!passed !! @!failed).push($usable-number);
+					($entry.ok ?? @!actual-passed !! @!actual-failed).push($usable-number);
+					@!todo.push($usable-number) if $entry.directive ~~ TAP::Todo;
+					@!todo-passed.push($usable-number) if $entry.ok && $entry.directive == TAP::Todo;
+					@!skipped.push($usable-number) if $entry.directive == TAP::Skip;
 				}
 				when TAP::Bailout {
 					if $!bailout.defined {
@@ -83,7 +93,8 @@ package TAP::Parser {
 			$!done.keep(True);
 		}
 		method finalize(Str $name, Proc::Status $exit-status) {
-			return TAP::Result.new(:$name, :$!tests-planned, :$!tests-run, :$!passed, :$!failed, :@!errors, :$!skip-all, :$exit-status);
+			return TAP::Result.new(:$name, :$!tests-planned, :$!tests-run, :@!passed, :@!failed, :@!errors, :$!skip-all,
+				:@!actual-passed, :@!actual-failed, :@!todo, :@!todo-passed, :@!skipped, :$exit-status);
 		}
 		method !add-error(Str $error) {
 			push @!errors, $error;

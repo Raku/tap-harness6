@@ -4,15 +4,24 @@ package TAP {
 		has Str $.name;
 		has Int $.tests-planned;
 		has Int $.tests-run;
-		has Int $.passed;
-		has Int $.failed;
+		has Int @.passed;
+		has Int @.failed;
 		has Str @.errors;
+		has Int @.actual-passed;
+		has Int @.actual-failed;
+		has Int @.todo;
+		has Int @.todo-passed;
+		has Int @.skipped;
 		has Bool $.skip-all;
 		has Proc::Status $.exit-status;
+
+		method has-problems() {
+			return @!failed || @!errors || ($!exit-status && $!exit-status.exit > 0);
+		}
 	}
 
 	class Aggregator {
-		has Result %!results-for;
+		has Result %.results-for;
 		has Result @!parse-order;
 
 		has Int $.parsed = 0;
@@ -21,6 +30,12 @@ package TAP {
 		has Int $.passed = 0;
 		has Int $.failed = 0;
 		has Str @.errors;
+		has Int $.actual-passed = 0;
+		has Int $.actual-failed = 0;
+		has Int $.todo;
+		has Int $.todo-passed;
+		has Int $.skipped;
+		has Bool $.exit-failed = False;
 
 		method add-result(Result $result) {
 			my $description = $result.name;
@@ -29,15 +44,31 @@ package TAP {
 			@!parse-order.push($result);
 
 			$!parsed++;
-			$!tests-planned += $result.tests-planned // 0;
+			$!tests-planned += $result.tests-planned // 1;
 			$!tests-run += $result.tests-run;
-			$!passed += $result.passed;
-			$!failed += $result.failed;
+			$!passed += $result.passed.elems;
+			$!failed += $result.failed.elems;
+			$!actual-passed += $result.actual-passed.elems;
+			$!actual-failed += $result.actual-failed.elems;
+			$!todo += $result.todo.elems;
+			$!todo-passed += $result.todo-passed.elems;
+			$!skipped += $result.skipped.elems;
 			@!errors.push(@($result.errors));
+			$!exit-failed = True if $result.exit-status && $result.exit-status.exit > 0;
 		}
 
-		method descriptions {
+		method descriptions() {
 			return @!parse-order.map(*.name);
+		}
+
+		method has-problems() {
+			return $!todo-passed || self.has-errors;
+		}
+		method has-errors() {
+			return $!failed || @!errors || $!exit-failed;
+		}
+		method get-status() {
+			return self.has-errors || $!tests-run != $!passed ?? 'FAILED' !! $!tests-run ?? 'PASS' !! 'NOTESTS';
 		}
 	}
 }

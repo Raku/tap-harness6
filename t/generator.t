@@ -30,6 +30,8 @@ $h.test(:ok($result.tests-planned == 3), :description('Expected 3 test'));
 $h.test(:ok($result.tests-run == 3), :description('Ran 3 test'));
 $h.test(:ok($result.passed == 3), :description('Passed 3 tests'));
 $h.test(:ok($result.failed == 0), :description('Failed 0 tests'));
+$h.test(:ok($result.todo-passed == 0), :description('Todo-passed 0 tests'));
+$h.test(:ok($result.skipped == 1), :description('Skipped 1 test'));
 
 my @expected = 
 	TAP::Plan,
