@@ -38,7 +38,7 @@ package TAP {
 			<yaml-end>
 		}
 		token unknown {
-			\N+
+			\N*
 		}
 	}
 	class Action {
@@ -49,13 +49,22 @@ package TAP {
 			make $/.values[0].ast;
 		}
 		method plan($/) {
-			make TAP::Plan.new(:raw($/.Str), :tests($<count>.Int), | %( $/.kv.map( * => ~* )));
+			my %args = :raw($/.Str), :tests($<count>.Int);
+			if $<directive> {
+				%args<skip-all explanation> = True, $<explanation>;
+			}
+			make TAP::Plan.new(|%args);
 		}
 		method test($/) {
-			make TAP::Test.new(:raw($/.Str), :ok(!$<nok>.Str), :number($<num>.defined ?? $<num>.Int !! Int), | %( $/.kv.map( * => ~* )));
+			my %args = (:raw($/.Str), :ok(!$<nok>.Str));
+			%args<number> = $<num>.defined ?? $<num>.Int !! Int;
+			%args<description> = ~$<description> if $<description>;
+			%args<directive> = $<directive> ?? TAP::Directive::{$<directive>.Str.substr(0,4).lc.tc} !! TAP::No-Directive;
+			%args<explanation> = ~$<explanation> if $<explanation>;
+			make TAP::Test.new(|%args);
 		}
 		method bailout($/) {
-			make TAP::Bailout.new(:raw($/.Str), | %( $/.kv.map( * => ~* )));
+			make TAP::Bailout.new(:raw($/.Str), :explanation($<explanation> ?? ~$<explanation> !! Str));
 		}
 		method version($/) {
 			make TAP::Version.new(:raw($/.Str), :version($<version>.Int));

@@ -14,31 +14,28 @@ package TAP {
 	}
 	class Plan does Entry {
 		has Int:D $.tests = !!! 'tests is required';
-		has Str $.directive;
+		has Bool $.skip-all;
 		has Str $.explanation;
 		method to_string() {
-			('1..' ~ $!tests ~ ($!directive.defined ?? ("#$!directive", $!explanation).grep(*.defined) !! () )).join(' ');
+			return ('1..' ~ $!tests ~ ($!skip-all ?? ('#SKIP', $!explanation).grep(*.defined) !! () )).join(' ');
 		}
 	}
+
+	enum Directive <No-Directive Skip Todo>;
+
 	class Test does Entry {
 		has Bool:D $.ok;
 		has Int $.number;
 		has Str $.description;
-		has Str $.directive;
+		has Directive:D $.directive = No-Directive;
 		has Str $.explanation;
 
 		method is-ok() {
-			return $!ok || $.is-todo;
-		}
-		method is-todo() {
-			return $!directive.defined && $!directive ~~ m:i/ ^ 'TODO' /;
-		}
-		method is-skipped() {
-			return $!directive.defined && $!directive ~~ m:i/ ^ 'SKIP' /;
+			return $!ok || $!directive ~~ Todo;
 		}
 		method to_string() {
 			my @ret = ($!ok ?? 'ok' !! 'not ok'), $!number, '-', $!description;
-			@ret.push("#$!directive", $!explanation) if $!directive.defined;
+			@ret.push('#'~$!directive.uc, $!explanation) if $!directive;
 			return @ret.grep(*.defined).join(' ');
 		}
 	}

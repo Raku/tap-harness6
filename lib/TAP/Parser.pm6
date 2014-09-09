@@ -39,7 +39,7 @@ package TAP::Parser {
 					else {
 						$!tests-planned = $entry.tests;
 						$!seen-plan = $!tests-run ?? After !! Before;
-						$!skip-all = ?$entry.directive;
+						$!skip-all = $entry.skip-all;
 					}
 				}
 				when TAP::Test {
