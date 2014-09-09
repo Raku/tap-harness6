@@ -92,14 +92,21 @@ package TAP::Parser {
 
 	class Async {
 		role Source {
-			method start(Supply) { ... }
-			method done() { ... }
-			method kill() { }
-			method exit-status() { Proc::Status }
+			method run(Supply) { ... }
+		}
+		class Run {
+			has Any $!process where *.can('kill');
+			has Promise:D $.done;
+			method kill() {
+				$!process.kill if $!process;
+			}
+			method exit-status() {
+				$.done && $.done.result ~~ Proc::Status ?? $.done.result !! Proc::Status;
+			}
 		}
 
 		has Str $.name;
-		has Source $!source;
+		has Run $!run;
 		has State $!state;
 		has Promise $.done;
 		has TAP::Session $.session;
@@ -111,51 +118,40 @@ package TAP::Parser {
 				$entries.tap(-> $entry { $handler.handle-entry($entry) }, :done(-> {$handler.end-entries}));
 			}
 
-			$!source.start($entries);
-			$!done = Promise.allof($!state.done, $!source.done);
+			$!run = $source.run($entries);
+			$!done = Promise.allof($!state.done, $!run.done);
 		}
 
 		method kill() {
-			$!source.kill();
+			$!run.kill();
 			$!done.break("killed") if not $!done;
 		}
 
 		has TAP::Result $!result;
 		method result {
-			return $!done ?? $!result //= $!state.finalize($!name, $!source.exit-status) !! Nil;
+			return $!done ?? $!result //= $!state.finalize($!name, $!run.exit-status) !! TAP::Result;
 		}
 
 		class Source::Proc does Source {
-			has Proc::Async $!process;
-			has Supply $!input;
-			has Promise $.done;
-			submethod BUILD(:$path, :$args) {
-				$!process = Proc::Async.new(:$path, :$args);
-				$!input = $!process.stdout_chars();
-			}
-			method start(Supply $output) {
+			has IO::Path $.path;
+			has @.args;
+			method run(Supply $output) {
+				my $process = Proc::Async.new(:$!path, :@!args);
+				my $input = $process.stdout_chars();
 				my $lexer = TAP::Lexer.new(:$output);
 				my $done = False;
-				$!input.act(-> $data { $lexer.add-data($data) }, :done({ $output.done() if !$done++; }));
-				$!done = $!process.start();
-			}
-			method kill() {
-				$!process.kill();
-			}
-			method exit-status {
-				return $!done ?? $!done.result !! nextsame;
+				$input.act(-> $data { $lexer.add-data($data) }, :done({ $output.done() if !$done++; }));
+				return Run.new(:done($process.start()), :$process);
 			}
 		}
 		class Source::File does Source {
 			has Str $.filename;
-			has Thread $.done;
-			submethod BUILD(Str :$!filename) { }
-			method start(Supply $output) {
+			method run(Supply $output) {
 				my $lexer = TAP::Lexer.new(:$output);
-				$!done = start {
+				return Run.new(:done(start {
 					$lexer.add-data($!filename.IO.slurp);
 					$output.done();
-				};
+				}));
 			}
 		}
 	}
