@@ -139,8 +139,7 @@ package TAP::Parser {
 				my $process = Proc::Async.new(:$!path, :@!args);
 				my $input = $process.stdout_chars();
 				my $lexer = TAP::Lexer.new(:$output);
-				my $done = False;
-				$input.act(-> $data { $lexer.add-data($data) }, :done({ $output.done() if !$done++; }));
+				$input.act(-> $data { $lexer.add-data($data) }, :done({ $output.done() }));
 				return Run.new(:done($process.start()), :$process);
 			}
 		}
