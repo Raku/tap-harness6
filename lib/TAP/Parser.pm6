@@ -153,5 +153,27 @@ package TAP::Parser {
 				}));
 			}
 		}
+		class Source::Through does Source does TAP::Entry::Handler {
+			has Promise $.done = Promise.new;
+			has TAP::Entry @!entries;
+			has Supply $!input = Supply.new;
+			has Supply $!supply = Supply.new;
+			method run(Supply $output) {
+				for @!entries -> $entry {
+					$output.more($entry);
+				}
+				$!input.act(-> $entry {
+					$output.more($entry);
+					@!entries.push($entry);
+				}, :done({ $output.done() }));
+				return Run.new(:done($!input.Promise));
+			}
+			method handle-entry(TAP::Entry $entry) {
+				$!input.more($entry);
+			}
+			method end-entries() {
+				$!input.done();
+			}
+		}
 	}
 }
