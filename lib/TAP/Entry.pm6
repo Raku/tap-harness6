@@ -1,14 +1,14 @@
 package TAP {
 	role Entry {
 		has Str $.raw;
-		method to_string { ... }
+		method to-string { ... }
 		method Str {
-			return $.raw // $.to_string;
+			return $.raw // $.to-string;
 		}
 	}
 	class Version does Entry {
 		has Int:D $.version;
-		method to_string() {
+		method to-string() {
 			return "TAP Version $!version";
 		}
 	}
@@ -16,7 +16,7 @@ package TAP {
 		has Int:D $.tests = !!! 'tests is required';
 		has Bool $.skip-all;
 		has Str $.explanation;
-		method to_string() {
+		method to-string() {
 			return ('1..' ~ $!tests ~ ($!skip-all ?? ('#SKIP', $!explanation).grep(*.defined) !! () )).join(' ');
 		}
 	}
@@ -33,7 +33,7 @@ package TAP {
 		method is-ok() {
 			return $!ok || $!directive ~~ Todo;
 		}
-		method to_string() {
+		method to-string() {
 			my @ret = ($!ok ?? 'ok' !! 'not ok'), $!number, '-', $!description;
 			@ret.push('#'~$!directive.uc, $!explanation) if $!directive;
 			return @ret.grep(*.defined).join(' ');
@@ -41,24 +41,24 @@ package TAP {
 	}
 	class Bailout does Entry {
 		has Str $.explanation;
-		method to_string {
+		method to-string {
 			return ('Bail out!', $.explanation).grep(*.defined).join(' ');
 		}
 	}
 	class Comment does Entry {
 		has Str $.comment = !!! 'comment is required';
-		method to_string {
+		method to-string {
 			return "# $!comment";
 		}
 	}
 	class YAML does Entry {
 		has Str:D $.content;
-		method to_string {
+		method to-string {
 			return "  ---\n" ~ $!content.subst(/^^/, '  ', :g) ~~ '  ...'
 		}
 	}
 	class Unknown does Entry {
-		method to_string {
+		method to-string {
 			$!raw // fail 'Can\'t stringify empty Unknown';
 		}
 	}

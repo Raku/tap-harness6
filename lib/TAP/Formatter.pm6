@@ -26,7 +26,7 @@ package TAP {
 		}
 		method output { ... }
 		method open-test { ... }
-		method format_name($name) {
+		method format-name($name) {
 			my $periods = '.' x ( $!longest + 2 - $name.chars);
 			return "$name $periods ";
 		}
@@ -35,7 +35,7 @@ package TAP {
 	class Formatter::Console does Formatter {
 		class Session does TAP::Session {
 			has TAP::Formatter $.formatter;
-			has Str $!pretty = $!formatter.format_name($!name);
+			has Str $!pretty = $!formatter.format-name($!name);
 			has TAP::Plan $!plan;
 			has Int $!last-updated = 0;
 			has Str $!planstr = '/?';
