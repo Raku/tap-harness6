@@ -125,4 +125,13 @@ package TAP {
 			@!handlers.push($handler);
 		}
 	}
+
+	class Collector does Entry::Handler {
+		has @.entries;
+		submethod BUILD() {
+		}
+		method handle-entry(Entry $entry) {
+			@!entries.push($entry);
+		}
+	}
 }
