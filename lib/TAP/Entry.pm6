@@ -99,4 +99,24 @@ package TAP {
 			return Output.new(:$handle);
 		}
 	}
+
+	class Entry::Handler::Multi does Entry::Handler {
+		has @!handlers;
+		submethod BUILD(:@handlers) {
+			@!handlers = @handlers;
+		}
+		method handle-entry(Entry $entry) {
+			for @!handlers -> $handler {
+				$handler.handle-entry($entry);
+			}
+		}
+		method end-entries() {
+			for @!handlers -> $handler {
+				$handler.end-entries();
+			}
+		}
+		method add-handler(Entry::Handler $handler) {
+			@!handlers.push($handler);
+		}
+	}
 }
