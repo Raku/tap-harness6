@@ -39,12 +39,13 @@ class TAP::Harness {
 				last if $kill;
 				my $source = @!handlers.max(*.can-handle($name)).make-async-source($name);
 				my $session = $formatter.open-test($name);
-				@working.push(TAP::Parser::Async.new(:$name, :$source, :$session, :$kill));
+				my $parser = TAP::Parser::Async.new(:$name, :$source, :$session, :$kill);
+				@working.push({ :$parser, :$session, :done($parser.done) });
 				next if @working < $parallel;
-				await Promise.anyof(@working.map(*.done), $kill);
+				await Promise.anyof(@working.map(*.<done>), $kill);
 				reap-finished();
 			}
-			await Promise.anyof(Promise.allof(@working.map(*.done)), $kill) if @working && not $kill;
+			await Promise.anyof(Promise.allof(@working.map(*.<done>)), $kill) if @working && not $kill;
 			reap-finished();
 			if ($kill) {
 				.kill for @working;
@@ -54,9 +55,9 @@ class TAP::Harness {
 		sub reap-finished() {
 			my @new-working;
 			for @working -> $current {
-				if $current.done {
-					$aggregator.add-result($current.result);
-					$current.session.close-test($current.result);
+				if $current<done> {
+					$aggregator.add-result($current<parser>.result);
+					$current<session>.close-test($current<parser>.result);
 				}
 				else {
 					@new-working.push($current);

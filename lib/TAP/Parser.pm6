@@ -122,10 +122,10 @@ package TAP::Parser {
 		has Promise $.done;
 		has TAP::Session $.session;
 
-		submethod BUILD(Str :$!name, Source :$source, TAP::Session :$!session = TAP::Session::Fake, :@handlers, Promise :$bailout = Promise) {
+		submethod BUILD(Str :$!name, Source :$source, :@handlers, Promise :$bailout = Promise) {
 			my $entries = Supply.new;
 			$!state = State.new(:$bailout);
-			for ($!state, $!session, @handlers).grep(*.defined) -> $handler {
+			for ($!state, @handlers).grep(*.defined) -> $handler {
 				$entries.tap(-> $entry { $handler.handle-entry($entry) }, :done(-> {$handler.end-entries}));
 			}
 
