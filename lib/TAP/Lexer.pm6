@@ -6,7 +6,7 @@ package TAP {
 		token TOP { ^ <line>+ $ }
 		token ws { <[\s] - [\n]> }
 		token line {
-			^^ [ <plan> | <test> | <bailout> | <version> | <comment> | <yaml> || <unknown> ] \n
+			^^ [ <plan> | <test> | <bailout> | <version> | <comment> | <yaml> | <sub-line> || <unknown> ] \n
 		}
 		token plan {
 			'1..' $<count>=[\d+] [ '#' <ws>* $<directive>=[:i 'SKIP'] \S+ <ws>+ $<explanation>=[\N*] ]?
@@ -36,6 +36,9 @@ package TAP {
 			$<indent>=[<ws>+] '---' \n
 			$<content>=[ [ <yaml-line> \n ]+ ]
 			<yaml-end>
+		}
+		token sub-line {
+			$<indent>=('    '+) $<entry>=( <plan> | <test> | <comment> | <yaml> || <unknown> )
 		}
 		token unknown {
 			\N*
@@ -76,6 +79,12 @@ package TAP {
 			my $indent = $<indent>.Str;
 			my $content = $/<content>.Str.subst(/ ^^ <$indent>/, '', :g);
 			make TAP::YAML.new(:raw($/.Str), :$content);
+		}
+		method sub-line($/) {
+			my $entry = $<entry>.values[0].ast;
+			my TAP::Sub-Entry:T $type = TAP::Sub-Entry-Base but TAP::Sub-Entry[$entry.WHAT];
+			my $level = Int($<indent>.Str.chars / 4);
+			make $type.new(:$level, :$entry);
 		}
 		method unknown($/) {
 			make TAP::Unknown.new(:raw($/.Str));
