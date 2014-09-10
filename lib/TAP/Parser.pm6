@@ -106,7 +106,13 @@ package TAP::Parser {
 			has Str $.name;
 			method run(Supply) { ... }
 			method make-parser(:@handlers, Promise :$bailout) {
-				return Async.new(:$!name, :source(self), :@handlers, :$bailout);
+				my $entries = Supply.new;
+				my $state = State.new(:$bailout);
+				for $state, @handlers -> $handler {
+					$entries.tap(-> $entry { $handler.handle-entry($entry) }, :done(-> { $handler.end-entries() }));
+				}
+				my $run = self.run($entries);
+				return Async.new(:$!name, :$state, :$run);
 			}
 		}
 		class Run {
@@ -125,14 +131,7 @@ package TAP::Parser {
 		has State $!state;
 		has Promise $.done;
 
-		submethod BUILD(Str :$!name, Source :$source, :@handlers, Promise :$bailout = Promise) {
-			my $entries = Supply.new;
-			$!state = State.new(:$bailout);
-			for ($!state, @handlers).grep(*.defined) -> $handler {
-				$entries.tap(-> $entry { $handler.handle-entry($entry) }, :done(-> {$handler.end-entries}));
-			}
-
-			$!run = $source.run($entries);
+		submethod BUILD(Str :$!name, State :$!state, Run :$!run) {
 			$!done = Promise.allof($!state.done, $!run.done);
 		}
 
