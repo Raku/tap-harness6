@@ -14,9 +14,21 @@ package TAP {
 		has Int @.skipped;
 		has Bool $.skip-all;
 		has Proc::Status $.exit-status;
+		method exit() {
+			$!exit-status.defined ?? $!exit-status.exit !! Int;
+		}
+		method wait() {
+			$!exit-status.defined ?? $!exit-status.status !! Int;
+		}
 
 		method has-problems() {
-			return @!failed || @!errors || ($!exit-status && $!exit-status.exit > 0);
+			@!todo || self.has-errors;
+		}
+		method has-errors() {
+			return @!failed || @!errors || self.exit-failed;
+		}
+		method exit-failed() {
+			return $!exit-status && $!exit-status.exit > 0;
 		}
 	}
 

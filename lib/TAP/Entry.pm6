@@ -81,7 +81,6 @@ package TAP {
 	}
 
 	role Session does Entry::Handler {
-		has Str $.name;
 		method close-test() { ... }
 	}
 
