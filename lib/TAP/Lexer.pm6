@@ -12,7 +12,7 @@ package TAP {
 			'1..' $<count>=[\d+] [ '#' <ws>* $<directive>=[:i 'SKIP'] \S+ <ws>+ $<explanation>=[\N*] ]?
 		}
 		token test {
-			$<nok>=['not '?] 'ok' [ <ws> $<num>=[\d] ]? ' -'?
+			$<nok>=['not '?] 'ok' [ <ws> $<num>=[\d+] ]? ' -'?
 				[ <ws>+ $<description>=[<-[\n\#]>+] ]?
 				[ <ws>* '#' <ws>* $<directive>=[:i [ 'SKIP' | 'TODO'] \S* ] <ws>+ $<explanation>=[\N*] ]?
 				<ws>*
