@@ -5,13 +5,16 @@ class TAP::Harness {
 	role SourceHandler {
 		method can-handle {...};
 		method make-async-source {...};
+		method make-async-parser(Any :$name, :@handlers, Promise :$bailout) {
+			self.make-async-source($name).make-parser(:@handlers :$bailout);
+		}
 	}
 	class SourceHandler::Perl6 does SourceHandler {
 		method can-handle($filename) {
 			return True;
 		}
-		method make-async-source($filename) {
-			return TAP::Parser::Async::Source::Proc.new(:path($*EXECUTABLE), :args([$filename]));
+		method make-async-source($name) {
+			return TAP::Parser::Async::Source::Proc.new(:$name, :path($*EXECUTABLE), :args([$name]));
 		}
 	}
 
@@ -37,9 +40,8 @@ class TAP::Harness {
 		my $done = start {
 			for @!sources -> $name {
 				last if $kill;
-				my $source = @!handlers.max(*.can-handle($name)).make-async-source($name);
 				my $session = $formatter.open-test($name);
-				my $parser = TAP::Parser::Async.new(:$name, :$source, :$session, :$kill);
+				my $parser = @!handlers.max(*.can-handle($name)).make-async-parser(:$name, :handlers([$session]), :$kill);
 				@working.push({ :$parser, :$session, :done($parser.done) });
 				next if @working < $parallel;
 				await Promise.anyof(@working.map(*.<done>), $kill);

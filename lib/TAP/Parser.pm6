@@ -103,7 +103,11 @@ package TAP::Parser {
 
 	class Async {
 		role Source {
+			has Str $.name;
 			method run(Supply) { ... }
+			method make-parser(:@handlers, Promise :$bailout) {
+				return Async.new(:$!name, :source(self), :@handlers, :$bailout);
+			}
 		}
 		class Run {
 			has Any $!process where *.can('kill');
@@ -120,7 +124,6 @@ package TAP::Parser {
 		has Run $!run;
 		has State $!state;
 		has Promise $.done;
-		has TAP::Session $.session;
 
 		submethod BUILD(Str :$!name, Source :$source, :@handlers, Promise :$bailout = Promise) {
 			my $entries = Supply.new;
@@ -155,11 +158,10 @@ package TAP::Parser {
 			}
 		}
 		class Source::File does Source {
-			has Str $.filename;
 			method run(Supply $output) {
 				my $lexer = TAP::Lexer.new(:$output);
 				return Run.new(:done(start {
-					$lexer.add-data($!filename.IO.slurp);
+					$lexer.add-data($!name.IO.slurp);
 					$output.done();
 				}));
 			}
