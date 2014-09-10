@@ -7,25 +7,27 @@ my $parser = $source.make-parser();
 my $elements = TAP::Collector.new();
 my $g = TAP::Generator.new(:output(TAP::Entry::Handler::Multi.new(:handlers($source, $elements))));
 
-$g.plan(3);
-$g.test(:ok, :description("This tests passes"));
+my $tester = start {
+	$g.plan(3);
+	$g.test(:ok, :description("This tests passes"));
 
-$g.start-subtest("subtest");
-$g.test(:ok);
-$g.plan(1);
-$g.stop-subtest();
+	$g.start-subtest("subtest");
+	$g.test(:ok);
+	$g.plan(1);
+	$g.stop-subtest();
 
-$g.test(:ok, :directive(TAP::Skip));
+	$g.test(:ok, :directive(TAP::Skip));
 
-my $ret = $g.stop-tests();
+	$g.stop-tests();
+};
 
-await $parser.done;
+await $parser.done, $tester;
 
 my $h = TAP::Generator.new(:output(TAP::Output.new));
 
 my $result = $parser.result;
 
-$h.test(:ok($ret == 0), :description('Test would have returned 0'));
+$h.test(:ok($tester.result == 0), :description('Test would have returned 0'));
 $h.test(:ok($result.tests-planned == 3), :description('Expected 3 test'));
 $h.test(:ok($result.tests-run == 3), :description('Ran 3 test'));
 $h.test(:ok($result.passed == 3), :description('Passed 3 tests'));
