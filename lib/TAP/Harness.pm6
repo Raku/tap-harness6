@@ -52,7 +52,7 @@ class TAP::Harness {
 			if ($kill) {
 				.kill for @working;
 			}
-			$formatter.summarize($aggregator);
+			$formatter.summarize($aggregator, ?$kill);
 			$aggregator;
 		};
 		sub reap-finished() {

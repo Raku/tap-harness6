@@ -20,10 +20,14 @@ package TAP {
 			my $periods = '.' x ( $!longest + 2 - $name.chars);
 			return "$name $periods ";
 		}
-		method summarize(TAP::Aggregator $aggregator) {
+		method summarize(TAP::Aggregator $aggregator, Bool $interrupted) {
 			my @tests = $aggregator.descriptions;
 			my $total = $aggregator.tests-run;
 			my $passed = $aggregator.passed;
+
+			if $interrupted {
+				self.failure-output("Test run interrupted!\n")
+			}
 
 			if $aggregator.failed == 0 {
 				self.success-output("All tests successful.\n");
