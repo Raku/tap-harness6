@@ -109,7 +109,7 @@ package TAP::Parser {
 				my $entries = Supply.new;
 				my $state = State.new(:$bailout);
 				for $state, @handlers -> $handler {
-					$entries.tap(-> $entry { $handler.handle-entry($entry) }, :done(-> { $handler.end-entries() }));
+					$entries.act(-> $entry { $handler.handle-entry($entry) }, :done(-> { $handler.end-entries() }));
 				}
 				my $run = self.run($entries);
 				return Async.new(:$!name, :$state, :$run);
