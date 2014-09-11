@@ -17,7 +17,7 @@ package TAP {
 		has Bool $.skip-all;
 		has Str $.explanation;
 		method to-string() {
-			return ('1..' ~ $!tests ~ ($!skip-all ?? ('#SKIP', $!explanation).grep(*.defined) !! () )).join(' ');
+			return ('1..' ~ $!tests, ($!skip-all ?? ('#SKIP', $!explanation).grep(*.defined) !! () )).join(' ');
 		}
 	}
 

@@ -69,12 +69,12 @@ package TAP {
 		multi method plan(Bool :$skip-all) {
 			$!context.handle-entry(TAP::Plan.new(:tests(0), :skip-all));
 		}
-		my subset Explanation of Str where m/ ^ \N* $ /;
+		subset Explanation of Str where m/ ^ \N* $ /;
 		multi method plan(Explanation :$skip-all) {
 			$!context.handle-entry(TAP::Plan.new(:tests(0), :skip-all, :explanation($skip-all)));
 		}
 
-		my subset Description of Str where m/ ^ <-[\n#]>* $ /;
+		subset Description of Str where m/ ^ <-[\n#]>* $ /;
 		method test(Bool :$ok, Description :$description = Description, TAP::Directive :$directive = TAP::No-Directive, Explanation :$explanation = Explanation) {
 			my $number = $!context.tests-seen + 1;
 			$!context.handle-entry(TAP::Test.new(:$ok, :$number, :$description, :$directive, :$explanation));
