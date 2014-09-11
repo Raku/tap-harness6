@@ -10,8 +10,8 @@ class TAP::Harness {
 		}
 	}
 	class SourceHandler::Perl6 does SourceHandler {
-		method can-handle($filename) {
-			return True;
+		method can-handle($name) {
+			return 0.5;
 		}
 		method make-async-source($name) {
 			return TAP::Parser::Async::Source::Proc.new(:$name, :path($*EXECUTABLE), :args([$name]));

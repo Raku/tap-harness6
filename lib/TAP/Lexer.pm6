@@ -46,7 +46,7 @@ package TAP {
 	}
 	class Action {
 		method TOP($/) {
-			make [ $/<line>.map(*.ast) ];
+			make [ $<line>.map(*.ast) ];
 		}
 		method line($/) {
 			make $/.values[0].ast;
@@ -77,7 +77,7 @@ package TAP {
 		}
 		method yaml($/) {
 			my $indent = $<indent>.Str;
-			my $content = $/<content>.Str.subst(/ ^^ <$indent>/, '', :g);
+			my $content = $<content>.Str.subst(/ ^^ <$indent>/, '', :g);
 			make TAP::YAML.new(:raw($/.Str), :$content);
 		}
 		method sub-line($/) {
