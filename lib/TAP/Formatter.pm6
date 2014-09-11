@@ -48,7 +48,7 @@ package TAP {
 							self.failure-output('  Failed tests:  ' ~ @failed.join(' ') ~ "\n");
 						}
 						if $result.todo-passed -> @todo-passed {
-							self.failure-output('  TODO passed:  ' ~ @todo-passed.join(' ') ~ "\n");
+							self.output('  TODO passed:  ' ~ @todo-passed.join(' ') ~ "\n");
 						}
 						if $result.exit-status.?exit { # XXX
 							if $result.exit-status.exit {
