@@ -139,6 +139,16 @@ package TAP {
 	}
 
 	class Formatter::Console does Formatter::Text {
+		my &colored = do {
+			try { require Term::ANSIColor }
+			GLOBAL::Term::ANSIColor::EXPORT::DEFAULT::<&colored> // sub (Str $text, Str $) { $text };
+		}
+		method success-output(Str $output) {
+			self.output(colored($output, 'green'));
+		}
+		method failure-output(Str $output) {
+			self.output(colored($output, 'red'));
+		}
 		class Session does Formatter::Text::Session {
 			has TAP::Plan $!plan;
 			has Int $!last-updated = 0;
