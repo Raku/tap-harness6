@@ -21,7 +21,6 @@ my $tester = start {
 		skip();
 	}
 }
-await $tester, $parser;
 
 is($tester.result, 0, 'Test would have returned 0');
 

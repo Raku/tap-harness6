@@ -21,13 +21,11 @@ my $tester = start {
 	$g.stop-tests();
 };
 
-await $parser.done, $tester;
-
 my $h = TAP::Generator.new(:output(TAP::Output.new));
 
-my $result = $parser.result;
-
 $h.test(:ok($tester.result == 0), :description('Test would have returned 0'));
+
+my $result = $parser.result;
 $h.test(:ok($result.tests-planned == 3), :description('Expected 3 test'));
 $h.test(:ok($result.tests-run == 3), :description('Ran 3 test'));
 $h.test(:ok($result.passed == 3), :description('Passed 3 tests'));
