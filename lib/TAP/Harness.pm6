@@ -33,7 +33,7 @@ class TAP::Harness {
 		}
 	}
 
-	method run(Int :$parallel = 2, TAP::Formatter :$formatter = $!formatter-class.new(:$parallel, :names(@.sources))) {
+	method run(Int :$jobs = 1, TAP::Formatter :$formatter = $!formatter-class.new(:parallel($jobs > 1), :names(@.sources))) {
 		my @working;
 		my $kill = Promise.new;
 		my $aggregator = TAP::Aggregator.new();
@@ -43,7 +43,7 @@ class TAP::Harness {
 				my $session = $formatter.open-test($name);
 				my $parser = @!handlers.max(*.can-handle($name)).make-async-parser(:$name, :handlers([$session]), :$kill);
 				@working.push({ :$parser, :$session, :done($parser.done) });
-				next if @working < $parallel;
+				next if @working < $jobs;
 				await Promise.anyof(@working.map(*.<done>), $kill);
 				reap-finished();
 			}

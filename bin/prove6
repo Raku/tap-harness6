@@ -12,7 +12,7 @@ sub MAIN(Bool :l($lib), Bool :b($blib), Int :j($jobs) = 1, *@files) {
 	@extra.unshift($*CWD ~ '/blib/lib') if $blib;
 	%*ENV<PERL6LIB> = @extra.join($path-sep) if @extra;
 
-	my $harness = TAP::Harness.new(:sources(@files), :parallel($jobs)).run;
+	my $harness = TAP::Harness.new(:sources(@files), :$jobs).run;
 	await $harness.done;
 	return min($harness.result.failed, 254);
 }
