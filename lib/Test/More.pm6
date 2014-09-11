@@ -2,8 +2,8 @@ use TAP::Entry;
 use TAP::Generator;
 
 module Test::More {
-	my $generator;
 	my sub generator() {
+		state $generator;
 		return $*tap-generator // $generator //= TAP::Generator.new(:output(TAP::Output.new));
 	}
 
@@ -22,10 +22,6 @@ module Test::More {
 
 	our $TODO is export = Str;
 
-	my sub arguments(Str :$todo, Str :$description) {
-		my %ret;
-		%ret<description>
-	}
 	my sub test-args() {
 		return $TODO.defined ?? %(:directive(TAP::Todo), :explanation($TODO)) !! ();
 	}

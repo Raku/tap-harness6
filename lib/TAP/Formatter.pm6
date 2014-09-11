@@ -33,7 +33,7 @@ package TAP {
 				self.success-output("All tests successful.\n");
 			}
 
-			if ($total != $passed || $aggregator.has-problems) {
+			if $total != $passed || $aggregator.has-problems {
 				self.output("\nTest Summary Report");
 				self.output("\n-------------------\n");
 				for @tests -> $name {

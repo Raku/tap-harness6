@@ -62,7 +62,7 @@ package TAP {
 			my %args = (:raw($/.Str), :ok(!$<nok>.Str));
 			%args<number> = $<num>.defined ?? $<num>.Int !! Int;
 			%args<description> = ~$<description> if $<description>;
-			%args<directive> = $<directive> ?? TAP::Directive::{$<directive>.Str.substr(0,4).lc.tc} !! TAP::No-Directive;
+			%args<directive> = $<directive> ?? TAP::Directive::{$<directive>.Str.substr(0,4).tclc} !! TAP::No-Directive;
 			%args<explanation> = ~$<explanation> if $<explanation>;
 			make TAP::Test.new(|%args);
 		}

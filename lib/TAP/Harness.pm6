@@ -23,13 +23,10 @@ class TAP::Harness {
 	has TAP::Formatter:T $.formatter-class = TAP::Formatter::Console;
 
 	class Run {
-		has Promise $.done;
+		has Promise $.done handles <result>;
 		has Promise $!kill;
 		method kill(Any $reason = True) {
-			$!kill.keep($reason) = Promise.new;
-		}
-		method result() {
-			return $!done.result;
+			$!kill.keep($reason);
 		}
 	}
 
@@ -49,7 +46,7 @@ class TAP::Harness {
 			}
 			await Promise.anyof(Promise.allof(@working.map(*.<done>)), $kill) if @working && not $kill;
 			reap-finished();
-			if ($kill) {
+			if $kill {
 				.kill for @working;
 			}
 			$formatter.summarize($aggregator, ?$kill);
