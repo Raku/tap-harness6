@@ -157,10 +157,12 @@ package TAP::Parser {
 			}
 		}
 		class Source::File does Source {
+			has Str $.filename;
+
 			method run(Supply $output) {
 				my $lexer = TAP::Lexer.new(:$output);
 				return Run.new(:done(start {
-					$lexer.add-data($!name.IO.slurp);
+					$lexer.add-data($!filename.IO.slurp);
 					$output.done();
 				}));
 			}
