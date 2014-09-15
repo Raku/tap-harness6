@@ -22,6 +22,7 @@ package TAP {
 	}
 
 	enum Directive <No-Directive Skip Todo>;
+	subset Directive::Explanation of Str where { not .defined or m/ ^ \N* $ / };
 
 	class Test does Entry {
 		has Bool:D $.ok;
@@ -39,6 +40,8 @@ package TAP {
 			return @ret.grep(*.defined).join(' ');
 		}
 	}
+	subset Test::Description of Str where { not .defined or m/ ^ <-[\n#]>* $ / };
+
 	class Bailout does Entry {
 		has Str $.explanation;
 		method to-string {

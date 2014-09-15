@@ -26,12 +26,12 @@ module Test::More {
 		return $TODO.defined ?? %(:directive(TAP::Todo), :explanation($TODO)) !! ();
 	}
 
-	sub ok(Any $value, TAP::Generator::Description $description = TAP::Generator::Description) is export {
+	sub ok(Mu $value, TAP::Test::Description $description = Str) is export {
 		generator.test(:ok(?$value), :$description);
 		return ?$value;
 	}
 
-	sub is(Mu $got, Mu $expected, TAP::Generator::Description $description = TAP::Generator::Description) is export {
+	sub is(Mu $got, Mu $expected, TAP::Test::Description $description = Str) is export {
 		$got.defined; # Hack to deal with Failures
 		my $ok = $got eq $expected;
 		generator.test(:$ok, :$description, |test-args());
@@ -40,7 +40,7 @@ module Test::More {
 		}
 		return $ok;
 	}
-	sub isnt(Mu $got, Mu $expected, TAP::Generator::Description $description = TAP::Generator::Description) is export {
+	sub isnt(Mu $got, Mu $expected, TAP::Test::Description $description = Str) is export {
 		$got.defined; # Hack to deal with Failures
 		my $ok = $got ne $expected;
 		generator.test(:$ok, :$description, |test-args());
@@ -49,7 +49,7 @@ module Test::More {
 		}
 		return $ok;
 	}
-	sub like(Mu $got, Mu $expected, TAP::Generator::Description $description = TAP::Generator::Description) is export {
+	sub like(Mu $got, Mu $expected, TAP::Test::Description $description = Str) is export {
 		$got.defined; # Hack to deal with Failures
 		my $ok = $got ~~ $expected;
 		generator.test(:$ok, :$description, |test-args());
@@ -59,7 +59,7 @@ module Test::More {
 		return $ok;
 	}
 
-	sub cmp-ok(Mu $got, Any $op, Mu $expected, TAP::Generator::Description $description = TAP::Generator::Description) is export {
+	sub cmp-ok(Mu $got, Any $op, Mu $expected, TAP::Test::Description $description = Str) is export {
 		$got.defined; # Hack to deal with Failures
 		my $ok;
 		if $op ~~ Callable ?? $op !! try EVAL "&infix:<$op>" -> $matcher {
@@ -79,16 +79,16 @@ module Test::More {
 		}
 	}
 
-	sub pass(TAP::Generator::Description $description = TAP::Generator::Description) is export {
+	sub pass(TAP::Test::Description $description = Str) is export {
 		generator.test(:ok, :$description, |test-args());
 		return True;
 	}
-	sub flunk(TAP::Generator::Description $description = TAP::Generator::Description) is export {
+	sub flunk(TAP::Test::Description $description = Str) is export {
 		generator.test(:!ok, :$description, |test-args());
 		return False;
 	}
 
-	sub skip(TAP::Generator::Explanation $explanation= TAP::Generator::Explanation, Int $count = 1) is export {
+	sub skip(TAP::Directive::Explanation $explanation = Str, Int $count = 1) is export {
 		for 1 .. $count {
 			generator.test(:ok, :directive(TAP::Skip), :$explanation);
 		}
@@ -101,7 +101,7 @@ module Test::More {
 			generator.stop-subtest();
 		}
 	}
-	multi subtest(TAP::Generator::Description $description, &subtests) is export {
+	multi subtest(TAP::Test::Description $description, &subtests) is export {
 		generator.start-subtest($description);
 		subtests();
 		LEAVE {
