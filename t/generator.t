@@ -33,12 +33,10 @@ $h.test(:ok($result.failed == 0), :description('Failed 0 tests'));
 $h.test(:ok($result.todo-passed == 0), :description('Todo-passed 0 tests'));
 $h.test(:ok($result.skipped == 1), :description('Skipped 1 test'));
 
-my @expected = 
+my @expected =
 	TAP::Plan,
 	TAP::Test,
-	TAP::Sub-Entry[TAP::Comment],
-	TAP::Sub-Entry[TAP::Test],
-	TAP::Sub-Entry[TAP::Plan],
+	TAP::Sub-Test,
 	TAP::Test,
 	TAP::Test,
 ;

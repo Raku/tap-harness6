@@ -35,10 +35,7 @@ is($result.skipped.elems, 1, 'Skipped 1 test');
 my @expected =
 	TAP::Plan,
 	TAP::Test,
-	TAP::Sub-Entry[TAP::Comment],
-	TAP::Sub-Entry[TAP::Test],
-	TAP::Sub-Entry[TAP::Plan],
-	TAP::Test,
+	TAP::Sub-Test,
 	TAP::Test,
 ;
 

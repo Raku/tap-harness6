@@ -62,6 +62,11 @@ package TAP::Parser {
 					@!todo.push($usable-number) if $entry.directive ~~ TAP::Todo;
 					@!todo-passed.push($usable-number) if $entry.ok && $entry.directive == TAP::Todo;
 					@!skipped.push($usable-number) if $entry.directive == TAP::Skip;
+					when TAP::Sub-Test {
+						if !$entry.is-consistent {
+							self!add-error("Subtest $usable-number isn't coherent");
+						}
+					}
 				}
 				when TAP::Bailout {
 					if $!bailout.defined {

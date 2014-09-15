@@ -16,7 +16,7 @@ package TAP {
 				}
 				when TAP::Test {
 					$!tests-seen++;
-					$!failed++ if !$entry.ok;
+					$!failed++ if !$entry.is-ok();
 				}
 			}
 			self.emit($entry);
@@ -30,13 +30,12 @@ package TAP {
 
 	my class Context::Sub does Context {
 		has Str $.description;
-		has Int $.level;
+		has TAP::Entry @!entries;
 		method emit(TAP::Entry $entry) {
-			my TAP::Sub-Entry:T $type = TAP::Sub-Entry-Base but TAP::Sub-Entry[$entry.WHAT];
-			$!output.handle-entry($type.new(:$!level, :$entry));
+			@!entries.push($entry);
 		}
 		method subtest(Str $description) {
-			return Context::Sub.new(:$!output, :$description, :level($!level + 1));
+			return Context::Sub.new(:$!output, :$description);
 		}
 		method end-entries() {
 			if !$!tests-expected.defined {
@@ -44,13 +43,16 @@ package TAP {
 			}
 			nextsame;
 		}
+		method give-test() {
+			return TAP::Sub-Test.new(:ok(!$.failed), :$!description, :@!entries);
+		}
 	}
 	my class Context::Main does Context {
 		method emit(TAP::Entry $entry) {
 			$!output.handle-entry($entry);
 		}
 		method subtest(Str $description) {
-			return Context::Sub.new(:$!output, :$description, :level(1));
+			return Context::Sub.new(:$!output, :$description);
 		}
 	}
 	class Generator {
@@ -95,7 +97,7 @@ package TAP {
 				$!context.end-entries();
 				my $old = $!context;
 				$!context = @!constack.pop;
-				self.test(:ok(!$old.failed), :description($old.description));
+				$!context.handle-entry($old.give-test());
 			}
 			else {
 				fail 'No subtests to return from';

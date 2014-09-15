@@ -42,6 +42,17 @@ package TAP {
 	}
 	subset Test::Description of Str where { not .defined or m/ ^ <-[\n#]>* $ / };
 
+	class Sub-Test is Test {
+		has @.entries;
+
+		method is-consistent() {
+			return $.ok == ?all(@!entries.grep(Test)).is-ok;
+		}
+		method to_string() {
+			return (@!entries.map('    ' ~ *), callsame).join("\n");
+		}
+	}
+
 	class Bailout does Entry {
 		has Str $.explanation;
 		method to-string {
@@ -63,18 +74,6 @@ package TAP {
 	class Unknown does Entry {
 		method to-string {
 			$!raw // fail 'Can\'t stringify empty Unknown';
-		}
-	}
-
-	role Sub-Entry [::T = TAP::Entry] {
-		has Int $.level;
-		has ::T $.entry;
-		submethod BUILD(Int :$!level, ::T :$!entry) {
-		}
-	}
-	class Sub-Entry-Base is TAP::Unknown does Sub-Entry {
-		method to-string() {
-			return '    ' x $!level ~ $.entry;
 		}
 	}
 
