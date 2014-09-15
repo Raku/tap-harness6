@@ -26,16 +26,10 @@ package TAP {
 		token comment {
 			'#' <ws>* $<comment>=[\N*]
 		}
-		token yaml-line {
-			^^ <!yaml-end> \N*
-		}
-		token yaml-end {
-			^^ <ws>+ '...'
-		}
-		token yaml {
-			$<indent>=[<ws>+] '---' \n
-			$<content>=[ [ <yaml-line> \n ]+ ]
-			<yaml-end>
+		regex yaml {
+			$<indent>=[<ws>+] '---' \n :
+			[ ^^ $<indent> $<yaml-line>=[<!after '...'> \N* \n] : ]+
+			$<indent> '...'
 		}
 		token sub-line {
 			$<indent>=('    '+) $<entry>=( <plan> | <test> | <comment> | <yaml> || <unknown> )
@@ -77,7 +71,7 @@ package TAP {
 		}
 		method yaml($/) {
 			my $indent = $<indent>.Str;
-			my $content = $<content>.Str.subst(/ ^^ <$indent>/, '', :g);
+			my $content = $<yaml-line>.join('');
 			make TAP::YAML.new(:raw($/.Str), :$content);
 		}
 		method sub-line($/) {
