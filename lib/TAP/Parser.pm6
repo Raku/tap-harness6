@@ -147,7 +147,8 @@ package TAP::Parser {
 
 		has TAP::Result $!result;
 		method result {
-			return $!done ?? $!result //= $!state.finalize($!name, $!run.exit-status) !! TAP::Result;
+			await $!done;
+			return $!result //= $!state.finalize($!name, $!run.exit-status);
 		}
 
 		class Source::Proc does Source {
