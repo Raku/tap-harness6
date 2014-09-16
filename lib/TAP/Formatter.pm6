@@ -98,7 +98,7 @@ package TAP {
 			return if $!formatter.volume < Quiet;
 			self.output-return($!pretty);
 
-			my $total = $result.tests-planned // $result.test-run;
+			my $total = $result.tests-planned // $result.tests-run;
 			my $failed = $result.failed + abs($total - $result.tests-run);
 
 			if $result.exit -> $status {
