@@ -32,15 +32,13 @@ is($result.failed.elems, 0, 'Failed 0 tests');
 is($result.todo-passed.elems, 0, 'Todo-passed 0 tests');
 is($result.skipped.elems, 1, 'Skipped 1 test');
 
-my @expected =
-	TAP::Plan,
-	TAP::Test,
-	TAP::Sub-Test,
-	TAP::Test,
-;
-
-for @($elements.entries) Z @expected -> $got, $expected {
-	like($got, $expected, "Expected a " ~ $expected.WHAT.perl);
-}
+like($elements.entries[0], TAP::Plan, 'Expected a Plan');
+like($elements.entries[1], TAP::Test, 'Expected a Test');
+like($elements.entries[2], TAP::Sub-Test, 'Expected a Sub-Test');
+is($elements.entries[2].entries.elems, 3, 'Expected 3 entries in subtest');
+like($elements.entries[2].entries[0], TAP::Comment, 'Expected a Comment in subtest');
+like($elements.entries[2].entries[1], TAP::Test, 'Expected a Test in subtest');
+like($elements.entries[2].entries[2], TAP::Plan, 'Expected a Plan in subtest');
+like($elements.entries[3], TAP::Test, 'Expected a Test');
 
 done-testing();
