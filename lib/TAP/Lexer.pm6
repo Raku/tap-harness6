@@ -107,5 +107,11 @@ package TAP {
 				}
 			}
 		}
+		method close-data() {
+			if $!buffer.chars {
+				warn "Unparsed data left at end of stream: $!buffer";
+			}
+			$!output.done();
+		}
 	}
 }
