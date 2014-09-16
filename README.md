@@ -2,9 +2,9 @@
 
 This is an asynchronous TAP framework writen in Perl 6
 
-## Description
+# Description
 
-This module runs TAP test files and parser them asynchronously.
+This module runs TAP test files and parses them asynchronously.
 
 # WARNING
 
