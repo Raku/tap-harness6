@@ -15,6 +15,7 @@ package TAP::Parser {
 		has Int @!todo;
 		has Int @!todo-passed;
 		has Int @!skipped;
+		has Int $!unknowns = 0;
 		has Bool $!skip-all = False;
 
 		has Promise $.bailout;
@@ -78,6 +79,9 @@ package TAP::Parser {
 				}
 				when TAP::Comment {
 				}
+				when TAP::Unknown {
+					$!unknowns++;
+				}
 				default {
 					if $!seen-plan == After {
 						self!add-error("Got line {$/.Str} after late plan");
@@ -99,7 +103,7 @@ package TAP::Parser {
 		}
 		method finalize(Str $name, Proc::Status $exit-status) {
 			return TAP::Result.new(:$name, :$!tests-planned, :$!tests-run, :@!passed, :@!failed, :@!errors, :$!skip-all,
-				:@!actual-passed, :@!actual-failed, :@!todo, :@!todo-passed, :@!skipped, :$exit-status);
+				:@!actual-passed, :@!actual-failed, :@!todo, :@!todo-passed, :@!skipped, :$!unknowns, :$exit-status);
 		}
 		method !add-error(Str $error) {
 			push @!errors, $error;

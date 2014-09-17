@@ -12,6 +12,7 @@ package TAP {
 		has Int @.todo;
 		has Int @.todo-passed;
 		has Int @.skipped;
+		has Int $.unknowns;
 		has Bool $.skip-all;
 		has Proc::Status $.exit-status;
 		method exit() {
