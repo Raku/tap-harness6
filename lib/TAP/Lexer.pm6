@@ -32,11 +32,10 @@ package TAP {
 			$<indent> '...'
 		}
 		token sub-entry {
-			<plan> | <test> | <comment> || <unknown>
+			<plan> | <test> | <comment> || <!after <ws>+ > <unknown>
 		}
 		token sub-test {
-			$<indent>=[<ws>+] <sub-entry> \n
-			[ $<indent> <sub-entry> \n ] +
+			[ '    ' <sub-entry> \n ]+
 			<test>
 		}
 		token unknown {
@@ -82,8 +81,11 @@ package TAP {
 			my $content = $<yaml-line>.join('');
 			make TAP::YAML.new(:raw($/.Str), :$content);
 		}
+		method sub-entry($/) {
+			make $/.values[0].ast;
+		}
 		method sub-test($/) {
-			my @entries = @<sub-entry>;
+			my @entries = @<sub-entry>.map(*.ast);
 			make TAP::Sub-Test.new(:@entries, |self!make_test($<test>));
 		}
 		method unknown($/) {
