@@ -177,6 +177,18 @@ package TAP::Parser {
 				}));
 			}
 		}
+		class Source::String does Source {
+			has Str $.content;
+			method run(Supply $output) {
+				my $lexer = TAP::Lexer.new(:$output);
+				$lexer.add-data($!content);
+				sleep 1;
+				$lexer.close-data();
+				my $done = Promise.new;
+				$done.keep;
+				return Run.new(:$done);
+			}
+		}
 		class Source::Through does Source does TAP::Entry::Handler {
 			has Promise $.done = Promise.new;
 			has TAP::Entry @!entries;
