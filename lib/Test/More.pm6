@@ -79,6 +79,20 @@ module Test::More {
 		}
 	}
 
+	sub is-deeply(Mu $got, Mu $expected, TAP::Test::Description $description = Str) is export {
+		my $ok = $got eqv $expected;
+		generator.test(:$ok, :$description, |test-args());
+		if !$ok {
+			my $got_perl      = try { $got.perl };
+			my $expected_perl = try { $expected.perl };
+			if $got_perl.defined && $expected_perl.defined {
+				diag("expected: $expected_perl\n     got: $got_perl");
+			}
+		}
+		return $ok;
+	}
+
+
 	sub pass(TAP::Test::Description $description = Str) is export {
 		generator.test(:ok, :$description, |test-args());
 		return True;
