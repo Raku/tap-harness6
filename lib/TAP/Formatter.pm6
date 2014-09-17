@@ -18,7 +18,7 @@ package TAP {
 		}
 		method format-name($name) {
 			my $periods = '.' x ( $!longest + 2 - $name.chars);
-			return "$name $periods ";
+			return "$name $periods";
 		}
 		method summarize(TAP::Aggregator $aggregator, Bool $interrupted) {
 			my @tests = $aggregator.descriptions;
@@ -96,7 +96,7 @@ package TAP {
 		}
 		method output-test-failure(TAP::Result $result) {
 			return if $!formatter.volume < Quiet;
-			self.output-return($!pretty);
+			self.output-return("$!pretty ");
 
 			my $total = $result.tests-planned // $result.tests-run;
 			my $failed = $result.failed + abs($total - $result.tests-run);
