@@ -45,8 +45,23 @@ package TAP {
 	class Sub-Test is Test {
 		has @.entries;
 
-		method is-consistent() {
-			return $.ok == ?all(@!entries.grep(Test)).is-ok;
+		method inconsistencies(Str $usable-number = ~$.number // '?') {
+			my @errors;
+			my @tests = @!entries.grep(Test);
+			if $.ok != ?all(@tests).is-ok {
+				@errors.push: "Subtest $usable-number isn't coherent";
+			}
+			my @plans = @!entries.grep(Plan);
+			if !@plans {
+				@errors.push: "Subtest $usable-number doesn't have a plan";
+			}
+			elsif @plans > 1 {
+				@errors.push: "Subtest $usable-number has multiple plans";
+			}
+			elsif @plans[0].tests != @tests.elems {
+				@errors.push: "Subtest $usable-number expected { @plans[0].tests } but contains { @tests.elems } tests";
+			}
+			return @errors;
 		}
 		method to_string() {
 			return (@!entries.map('    ' ~ *), callsame).join("\n");

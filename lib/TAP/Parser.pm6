@@ -64,8 +64,8 @@ package TAP::Parser {
 					@!todo-passed.push($usable-number) if $entry.ok && $entry.directive == TAP::Todo;
 					@!skipped.push($usable-number) if $entry.directive == TAP::Skip;
 					when TAP::Sub-Test {
-						if !$entry.is-consistent {
-							self!add-error("Subtest $usable-number isn't coherent");
+						for $entry.inconsistencies(~$usable-number) -> $error {
+							self!add-error($error);
 						}
 					}
 				}
@@ -99,7 +99,7 @@ package TAP::Parser {
 					}
 				}
 			}
-			$!done.keep(True);
+			$!done.keep;
 		}
 		method finalize(Str $name, Proc::Status $exit-status) {
 			return TAP::Result.new(:$name, :$!tests-planned, :$!tests-run, :@!passed, :@!failed, :@!errors, :$!skip-all,

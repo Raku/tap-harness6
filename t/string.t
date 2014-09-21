@@ -20,7 +20,7 @@ ok 1 - foo
 ok 2 - bar passed
 1..2
 END
-parse-and-get($content2, :tests-planned(2), :tests-run(2), :passed(2), :failed(0), :todo-passed(0), :skipped(0), :unknowns(0), :errors(['Subtest 2 isn\'t coherent']));
+parse-and-get($content2, :tests-planned(2), :tests-run(2), :passed(2), :failed(0), :todo-passed(0), :skipped(0), :unknowns(0), :errors(['Subtest 2 isn\'t coherent', "Subtest 2 doesn't have a plan"]));
 
 my $content3 = q:heredoc/END/;
 ok 1 - foo
@@ -33,10 +33,9 @@ parse-and-get($content3, :tests-planned(2), :tests-run(2), :passed(2), :failed(0
 
 done-testing();
 
-my $i = 1;
-sub parse-and-get($content, :$tests-planned, :$tests-run, :$passed, :$failed, :$todo-passed, :$skipped, :$unknowns, :@errors = Array, :$name = "Test-{ $i++ }") {
-	my $source = TAP::Parser::Async::Source::String.new(:$name, :$content);
-	my $parser = $source.make-parser();
+my $i;
+sub parse-and-get($content, :$tests-planned, :$tests-run, :$passed, :$failed, :$todo-passed, :$skipped, :$unknowns, :@errors = Array, :$name = "Test-{ ++$i }") {
+	my $parser = TAP::Parser::Async::Source::String.new(:$name, :$content).make-parser();
 
 	my $result = $parser.result;
 	is($result.tests-planned, $tests-planned, "Expected $tests-planned planned tests in $name") if $tests-planned.defined;
