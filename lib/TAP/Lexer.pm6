@@ -9,33 +9,33 @@ package TAP {
 			^^ [ <plan> | <test> | <bailout> | <version> | <comment> | <yaml> | <sub-test> || <unknown> ] \n
 		}
 		token plan {
-			'1..' $<count>=[\d+] [ '#' <ws>* $<directive>=[:i 'SKIP'] \S+ <ws>+ $<explanation>=[\N*] ]?
+			'1..' $<count>=[\d+] [ '#' <.ws>* $<directive>=[:i 'SKIP'] \S+ <.ws>+ $<explanation>=[\N*] ]?
 		}
 		regex description {
 			[ <-[\n\#\\]> | \\<[\\#]> ]+ <!after \s+>
 		}
 		token test {
-			$<nok>=['not '?] 'ok' [ <ws> $<num>=[\d+] ]? ' -'?
-				[ <ws>+ <description> ]?
-				[ <ws>* '#' <ws>* $<directive>=[:i [ 'SKIP' | 'TODO'] \S* ] <ws>+ $<explanation>=[\N*] ]?
-				<ws>*
+			$<nok>=['not '?] 'ok' [ <.ws> $<num>=[\d+] ]? ' -'?
+				[ <.ws>+ <description> ]?
+				[ <.ws>* '#' <.ws>* $<directive>=[:i [ 'SKIP' | 'TODO'] \S* ] <.ws>+ $<explanation>=[\N*] ]?
+				<.ws>*
 		}
 		token bailout {
-			'Bail out!' [ <ws> $<explanation>=[\N*] ]?
+			'Bail out!' [ <.ws> $<explanation>=[\N*] ]?
 		}
 		token version {
 			:i 'TAP version ' $<version>=[\d+]
 		}
 		token comment {
-			'#' <ws>* $<comment>=[\N*]
+			'#' <.ws>* $<comment>=[\N*]
 		}
 		regex yaml {
-			$<indent>=[<ws>+] '---' \n :
+			$<indent>=[<.ws>+] '---' \n :
 			[ ^^ $<indent> $<yaml-line>=[<!after '...'> \N* \n] : ]+
 			$<indent> '...'
 		}
 		token sub-entry {
-			<plan> | <test> | <comment> || <!after <ws>+ > <unknown>
+			<plan> | <test> | <comment> || <!before <.ws>+ > <unknown>
 		}
 		token sub-test {
 			[ '    ' <sub-entry> \n ]+
