@@ -11,9 +11,12 @@ package TAP {
 		token plan {
 			'1..' $<count>=[\d+] [ '#' <ws>* $<directive>=[:i 'SKIP'] \S+ <ws>+ $<explanation>=[\N*] ]?
 		}
+		regex description {
+			[ <-[\n\#\\]> | \\<[\\#]> ]+ <!after \s+>
+		}
 		token test {
 			$<nok>=['not '?] 'ok' [ <ws> $<num>=[\d+] ]? ' -'?
-				[ <ws>+ $<description>=[<-[\n\#]>+] ]?
+				[ <ws>+ <description> ]?
 				[ <ws>* '#' <ws>* $<directive>=[:i [ 'SKIP' | 'TODO'] \S* ] <ws>+ $<explanation>=[\N*] ]?
 				<ws>*
 		}
@@ -59,9 +62,11 @@ package TAP {
 		method !make_test($/) {
 			my %args = (:raw($/.Str), :ok(!$<nok>.Str));
 			%args<number> = $<num>.defined ?? $<num>.Int !! Int;
-			%args<description> = ~$<description> if $<description>;
 			%args<directive> = $<directive> ?? TAP::Directive::{$<directive>.Str.substr(0,4).tclc} !! TAP::No-Directive;
 			%args<explanation> = ~$<explanation> if $<explanation>;
+			if $<description> {
+				%args<description> = $<description>.Str.subst(/\\('#'|'\\')/, $0, :g);
+			}
 			return %args;
 		}
 		method test($/) {
