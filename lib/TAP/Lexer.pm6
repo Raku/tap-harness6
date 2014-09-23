@@ -3,6 +3,14 @@ use TAP::Result;
 
 package TAP {
 	grammar Grammar {
+		method parse {
+			my $*tap-indent = 0;
+			callsame;
+		}
+		method subparse($, *%) {
+			my $*tap-indent = 0;
+			callsame;
+		}
 		token TOP { ^ <line>+ $ }
 		token ws { <[\s] - [\n]> }
 		token line {
@@ -35,11 +43,15 @@ package TAP {
 			$<indent> '...'
 		}
 		token sub-entry {
-			<plan> | <test> | <comment> || <!before <.ws>+ > <unknown>
+			<plan> | <test> | <comment> | <sub-test> || <!before <.ws>+ > <unknown>
 		}
-		token sub-test {
-			[ '    ' <sub-entry> \n ]+
-			<test>
+		token indent {
+			'    ' ** { $*tap-indent }
+		}
+		regex sub-test {
+			'    ' :temp $*tap-indent += 1; <sub-entry> \n
+			[ <.indent> <sub-entry> \n ]*
+			'    ' ** { $*tap-indent - 1 } <test>
 		}
 		token unknown {
 			\N*

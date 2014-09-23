@@ -31,6 +31,18 @@ END
 
 parse-and-get($content3, :tests-planned(2), :tests-run(2), :passed(2), :failed(0), :todo-passed(0), :skipped(0), :unknowns(1), :errors());
 
+my $content4 = q:heredoc/END/;
+1..2
+ok 1 - a
+        ok 1 - b
+        1..1
+    ok 1 - c
+    1..1
+ok 2 - e
+END
+
+parse-and-get($content4, :tests-planned(2), :tests-run(2), :passed(2), :failed(0), :todo-passed(0), :skipped(0), :unknowns(0), :errors());
+
 done-testing();
 
 my $i;
