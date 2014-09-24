@@ -36,7 +36,7 @@ module Test::More {
 		my $ok = $got eq $expected;
 		generator.test(:$ok, :$description, |test-args());
 		if !$ok {
-			generator.comment("expected: '$expected'\n     got: '$got'");
+			generator.comment("expected: '{$expected.gist}'\n     got: '{$got.gist}'");
 		}
 		return $ok;
 	}
@@ -45,7 +45,7 @@ module Test::More {
 		my $ok = $got ne $expected;
 		generator.test(:$ok, :$description, |test-args());
 		if !$ok {
-			generator.comment("twice: '$got'");
+			generator.comment("twice: '{$got.gist}'");
 		}
 		return $ok;
 	}
@@ -54,7 +54,7 @@ module Test::More {
 		my $ok = $got ~~ $expected;
 		generator.test(:$ok, :$description, |test-args());
 		if !$ok {
-			generator.comment("expected: {$expected.perl}\n     got: '$got'");
+			generator.comment("expected: {$expected.perl}\n     got: '{$got.gist}'");
 		}
 		return $ok;
 	}
@@ -66,14 +66,14 @@ module Test::More {
 			$ok = $matcher($got,$expected);
 			generator.test(:$ok, :$description, |test-args());
 			if !$ok {
-				generator.comment("expected: '{$expected // $expected.^name}'");
+				generator.comment("expected: '{$expected.gist}'");
 				generator.comment(" matcher: '$matcher'");
-				generator.comment("     got: '$got'");
+				generator.comment("     got: '{$got.gist}'");
 			}
 			return $ok;
 		}
 		else {
-			generator.test(:$ok, $description.defined ?? :$description !! ());
+			generator.test(:!ok, $description);
 			generator.comment("Could not use '$op' as a comparator");
 			return False;
 		}
