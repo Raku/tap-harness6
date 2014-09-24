@@ -25,6 +25,9 @@ package TAP {
 			if $!tests-expected.defined && $!tests-seen != $!tests-expected {
 				self.handle-entry(TAP::Comment.new(:comment("Expected $!tests-expected tests but seen $!tests-seen")));
 			}
+			elsif $!failed > 0 {
+				self.handle-entry(TAP::Comment.new(comment => "Looks like you failed $!failed test of $!tests-seen."));
+			}
 		}
 	}
 
