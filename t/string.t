@@ -43,6 +43,16 @@ END
 
 parse-and-get($content4, :tests-planned(2), :tests-run(2), :passed(2), :failed(0), :todo-passed(0), :skipped(0), :unknowns(0), :errors());
 
+my @entries = lex-and-get($content4);
+like(@entries[0], TAP::Plan, 'First Entry is a Plan');
+like(@entries[1], TAP::Test, 'Second entry is a subtest');
+like(@entries[2], TAP::Sub-Test, 'Third entry is a subtest');
+is-deeply(@entries[2].inconsistencies, [], 'Subtests has no errors');
+like(@entries[2].entries[0], TAP::Sub-Test, 'First sub-entry is a subtest');
+is-deeply(@entries[2].entries[0].inconsistencies, [], 'Subsubtests has no errors');
+
+diag("Extra tests for Test-4");
+
 done-testing();
 
 my $i;
@@ -61,4 +71,14 @@ sub parse-and-get($content, :$tests-planned, :$tests-run, :$passed, :$failed, :$
 
 	diag("Finished $name");
 	return $result;
+}
+
+sub lex-and-get($content) {
+	my $output = Supply.new;
+	my @ret;
+	$output.act: -> $entry { @ret.push: $entry };
+	my $lexer = TAP::Lexer.new(:$output);
+	$lexer.add-data($content);
+	$lexer.close-data();
+	return @ret;
 }
