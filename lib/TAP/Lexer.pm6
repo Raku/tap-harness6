@@ -37,18 +37,18 @@ package TAP {
 		token comment {
 			'#' <.ws>* $<comment>=[\N*]
 		}
-		regex yaml {
-			$<indent>=[<.ws>+] '---' \n :
-			[ ^^ $<indent> $<yaml-line>=[<!after '...'> \N* \n] : ]+
-			$<indent> '...'
+		token yaml {
+			$<yaml-indent>=['  '] '---' \n :
+			[ ^^ <.indent> $<yaml-indent> $<yaml-line>=[<!before '...'> \N* \n] ]*
+			<.indent> $<yaml-indent> '...'
 		}
 		token sub-entry {
-			<plan> | <test> | <comment> | <sub-test> || <!before <.ws>+ > <unknown>
+			<plan> | <test> | <comment> | <yaml> | <sub-test> || <!before <.ws>+ > <unknown>
 		}
 		token indent {
 			'    ' ** { $*tap-indent }
 		}
-		regex sub-test {
+		token sub-test {
 			'    ' :temp $*tap-indent += 1; <sub-entry> \n
 			[ <.indent> <sub-entry> \n ]*
 			'    ' ** { $*tap-indent - 1 } <test>
@@ -72,7 +72,7 @@ package TAP {
 			make TAP::Plan.new(|%args);
 		}
 		method !make_test($/) {
-			my %args = (:raw($/.Str), :ok(!$<nok>.Str));
+			my %args = (:ok(!$<nok>.Str));
 			%args<number> = $<num>.defined ?? $<num>.Int !! Int;
 			%args<directive> = $<directive> ?? TAP::Directive::{$<directive>.Str.substr(0,4).tclc} !! TAP::No-Directive;
 			%args<explanation> = ~$<explanation> if $<explanation>;
@@ -82,7 +82,7 @@ package TAP {
 			return %args;
 		}
 		method test($/) {
-			make TAP::Test.new(|self!make_test($/));
+			make TAP::Test.new(:raw($/.Str), |self!make_test($/));
 		}
 		method bailout($/) {
 			make TAP::Bailout.new(:raw($/.Str), :explanation($<explanation> ?? ~$<explanation> !! Str));
@@ -94,7 +94,6 @@ package TAP {
 			make TAP::Comment.new(:raw($/.Str), :comment($<comment>.Str));
 		}
 		method yaml($/) {
-			my $indent = $<indent>.Str;
 			my $content = $<yaml-line>.join('');
 			make TAP::YAML.new(:raw($/.Str), :$content);
 		}
@@ -103,7 +102,7 @@ package TAP {
 		}
 		method sub-test($/) {
 			my @entries = @<sub-entry>.map(*.ast);
-			make TAP::Sub-Test.new(:@entries, |self!make_test($<test>));
+			make TAP::Sub-Test.new(:raw($/.Str), :@entries, |self!make_test($<test>));
 		}
 		method unknown($/) {
 			make TAP::Unknown.new(:raw($/.Str));

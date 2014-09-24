@@ -53,6 +53,29 @@ is-deeply(@entries[2].entries[0].inconsistencies, [], 'Subsubtests has no errors
 
 diag("Extra tests for Test-4");
 
+my $content5 = q:heredoc/END/;
+1..2
+ok 1 - a
+    ok 1 - b
+      ---
+      - Foo
+      - Bar
+      ...
+    1..1
+ok 2 - c
+END
+
+parse-and-get($content5, :tests-planned(2), :tests-run(2), :passed(2), :failed(0), :todo-passed(0), :skipped(0), :unknowns(0), :errors());
+
+my @entries2 = lex-and-get($content5);
+like(@entries2[0], TAP::Plan, 'First Entry is a Plan');
+like(@entries2[1], TAP::Test, 'Second entry is a subtest');
+like(@entries2[2], TAP::Sub-Test, 'Third entry is a subtest');
+is-deeply(@entries2[2].inconsistencies, [], 'Subtests has no errors');
+like(@entries2[2].entries[1], TAP::YAML, 'Got YAML') or diag(@entries2[2].perl);
+
+diag("Extra tests for Test-5");
+
 done-testing();
 
 my $i;
