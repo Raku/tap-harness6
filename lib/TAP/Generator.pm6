@@ -2,13 +2,15 @@ use TAP::Entry;
 
 package TAP {
 	class Generator { ... }
+	class Context::Sub { ... }
 	role Context does TAP::Entry::Handler {
-		has TAP::Entry::Handler:D $.output;
 		has Int $.tests-expected;
 		has Int $.failed = 0;
 		has Int $.tests-seen = 0;
 		method emit(TAP::Entry) { ... }
-		method subtest() { ... }
+		method subtest(Str $description) {
+			return Context::Sub.new(:$description);
+		}
 		method handle-entry(TAP::Entry $entry) {
 			given ($entry) {
 				when TAP::Plan {
@@ -31,31 +33,26 @@ package TAP {
 		}
 	}
 
+	my class Context::Main does Context {
+		has TAP::Entry::Handler:D $.output;
+		method emit(TAP::Entry $entry) {
+			$!output.handle-entry($entry);
+		}
+	}
 	my class Context::Sub does Context {
 		has Str $.description;
 		has TAP::Entry @!entries;
 		method emit(TAP::Entry $entry) {
 			@!entries.push($entry);
 		}
-		method subtest(Str $description) {
-			return Context::Sub.new(:$!output, :$description);
-		}
 		method end-entries() {
 			if !$!tests-expected.defined {
 				self.handle-entry(TAP::Plan.new(:tests($!tests-seen)));
 			}
-			nextsame;
+			callsame;
 		}
 		method give-test() {
-			return TAP::Sub-Test.new(:ok(!$.failed), :$!description, :@!entries);
-		}
-	}
-	my class Context::Main does Context {
-		method emit(TAP::Entry $entry) {
-			$!output.handle-entry($entry);
-		}
-		method subtest(Str $description) {
-			return Context::Sub.new(:$!output, :$description);
+			return TAP::Sub-Test.new(:ok(!$!failed), :$!description, :@!entries);
 		}
 	}
 	class Generator {
