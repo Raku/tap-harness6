@@ -15,7 +15,7 @@ my $tester = start {
 
 		subtest 'Subtest', {
 			pass();
-			plan(1);
+			done-testing(1);
 		};
 
 		skip();

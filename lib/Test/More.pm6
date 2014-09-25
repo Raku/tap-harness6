@@ -8,9 +8,15 @@ module Test::More {
 	}
 
 	multi plan(Int $tests) is export {
+		if generator.tests-seen {
+			die "Can't produce plan in the middle of testing";
+		}
 		generator.plan($tests);
 	}
 	multi plan(Bool :$skip-all) is export {
+		if generator.tests-seen {
+			die "Can't produce plan in the middle of testing";
+		}
 		generator.plan(:skip-all);
 	}
 	multi done-testing() is export {
@@ -86,7 +92,7 @@ module Test::More {
 			my $got_perl      = try { $got.perl };
 			my $expected_perl = try { $expected.perl };
 			if $got_perl.defined && $expected_perl.defined {
-				diag("expected: $expected_perl\n     got: $got_perl");
+				generator.comment("expected: $expected_perl\n     got: $got_perl");
 			}
 		}
 		return $ok;
