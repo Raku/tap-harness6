@@ -40,7 +40,7 @@ package TAP {
 			return @ret.grep(*.defined).join(' ');
 		}
 	}
-	subset Test::Description of Str where { not .defined or m/ ^ <-[\n#]>* $ / };
+	subset Test::Description of Str where { not .defined or m/ ^ \N* $ / };
 
 	class Sub-Test is Test {
 		has @.entries;

@@ -78,8 +78,9 @@ package TAP {
 			$!context.handle-entry(TAP::Plan.new(:tests(0), :skip-all, :explanation($skip-all)));
 		}
 
-		method test(Bool :$ok, TAP::Test::Description :$description, TAP::Directive :$directive = TAP::No-Directive, TAP::Directive::Explanation :$explanation) {
+		method test(Bool :$ok, TAP::Test::Description :$description is copy, TAP::Directive :$directive = TAP::No-Directive, TAP::Directive::Explanation :$explanation) {
 			my $number = $!context.tests-seen + 1;
+			$description ~~ s:g/ ( '\\' | '#' ) /\\$0/ if $description.defined;
 			$!context.handle-entry(TAP::Test.new(:$ok, :$number, :$description, :$directive, :$explanation));
 		}
 		method comment(Str $comment) {
