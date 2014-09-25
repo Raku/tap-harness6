@@ -63,8 +63,8 @@ package TAP {
 			}
 			return @errors;
 		}
-		method to_string() {
-			return (@!entries.map('    ' ~ *), callsame).join("\n");
+		method to-string() {
+			return (@!entries.map(*.to-string().indent(4)), callsame).join("\n");
 		}
 	}
 
