@@ -14,10 +14,10 @@ module Test::More {
 		generator.plan(:skip-all);
 	}
 	multi done-testing() is export {
-		generator.done-testing();
+		generator.plan(generator.tests-seen);
 	}
 	multi done-testing(Int $count) is export {
-		generator.done-testing($count);
+		generator.plan($count);
 	}
 
 	our $TODO is export = Str;

@@ -48,6 +48,6 @@ for $elements.entries Z @expected -> $got, $expected {
 		$h.comment("Expected {$expected.WHAT.perl}, got a {$got.WHAT.perl}");
 	}
 }
-$h.done-testing();
+$h.plan($h.tests-seen);
 $h.stop-tests();
 

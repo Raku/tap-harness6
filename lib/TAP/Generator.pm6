@@ -62,7 +62,7 @@ package TAP {
 		has Int $.version;
 		has TAP::Entry::Handler:D $.output;
 		has Context @!constack;
-		has Context $!context;
+		has Context $!context handles <tests-seen>;
 		submethod BUILD(TAP::Entry::Handler :$!output, Int :$!version = 12) {
 			$!context = Context::Main.new(:$!output);
 			$!output.handle-entry(TAP::Version.new($!version)) if $!version > 12;
@@ -81,9 +81,6 @@ package TAP {
 		method test(Bool :$ok, TAP::Test::Description :$description, TAP::Directive :$directive = TAP::No-Directive, TAP::Directive::Explanation :$explanation) {
 			my $number = $!context.tests-seen + 1;
 			$!context.handle-entry(TAP::Test.new(:$ok, :$number, :$description, :$directive, :$explanation));
-		}
-		method done-testing(Int $tests = $!context.tests-seen) {
-			$!context.handle-entry(TAP::Plan.new(:$tests));
 		}
 		method comment(Str $comment) {
 			for @( $comment.split(/\n/) ) -> $line {
