@@ -71,7 +71,7 @@ package TAP {
 		}
 
 		method descriptions() {
-			return @!parse-order.map(*.name);
+			return @!parse-order».name;
 		}
 
 		method has-problems() {

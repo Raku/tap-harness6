@@ -14,7 +14,7 @@ package TAP {
 
 		has Int $!longest;
 		method BUILD(:$!parallel, :$!volume = Normal, :@names) {
-			$!longest = @names ?? @names.map(*.chars).max !! 12;
+			$!longest = @names ?? @names».chars.max !! 12;
 		}
 		method format-name($name) {
 			my $periods = '.' x ( $!longest + 2 - $name.chars);

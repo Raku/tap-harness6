@@ -64,7 +64,7 @@ package TAP {
 			return @errors;
 		}
 		method to-string() {
-			return (@!entries.map(*.to-string().indent(4)), callsame).join("\n");
+			return (@!entries».to-string()».indent(4), callsame).join("\n");
 		}
 	}
 

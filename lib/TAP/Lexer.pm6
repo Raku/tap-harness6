@@ -59,7 +59,7 @@ package TAP {
 	}
 	class Action {
 		method TOP($/) {
-			make [ $<line>.map(*.ast) ];
+			make @<line>».ast;
 		}
 		method line($/) {
 			make $/.values[0].ast;
@@ -101,7 +101,7 @@ package TAP {
 			make $/.values[0].ast;
 		}
 		method sub-test($/) {
-			my @entries = @<sub-entry>.map(*.ast);
+			my @entries = @<sub-entry>».ast;
 			make TAP::Sub-Test.new(:raw($/.Str), :@entries, |self!make_test($<test>));
 		}
 		method unknown($/) {

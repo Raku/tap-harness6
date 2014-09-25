@@ -41,10 +41,10 @@ class TAP::Harness {
 				my $parser = @!handlers.max(*.can-handle($name)).make-async-parser(:$name, :handlers([$session]), :$kill);
 				@working.push({ :$parser, :$session, :done($parser.done) });
 				next if @working < $jobs;
-				await Promise.anyof(@working.map(*.<done>), $kill);
+				await Promise.anyof(@working»<done>, $kill);
 				reap-finished();
 			}
-			await Promise.anyof(Promise.allof(@working.map(*.<done>)), $kill) if @working && not $kill;
+			await Promise.anyof(Promise.allof(@working»<done>), $kill) if @working && not $kill;
 			reap-finished();
 			if $kill {
 				.kill for @working;
