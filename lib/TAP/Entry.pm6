@@ -83,7 +83,7 @@ package TAP {
 	class YAML does Entry {
 		has Str:D $.content;
 		method to-string {
-			return "  ---\n" ~ $!content.subst(/^^/, '  ', :g) ~~ '  ...'
+			return "  ---\n" ~ $!content.indent(2) ~~ '  ...'
 		}
 	}
 	class Unknown does Entry {
