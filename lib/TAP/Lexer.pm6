@@ -13,17 +13,18 @@ package TAP {
 		}
 		token TOP { ^ <line>+ $ }
 		token ws { <[\s] - [\n]> }
+		token num { <[0..9]>+ }
 		token line {
 			^^ [ <plan> | <test> | <bailout> | <version> | <comment> | <yaml> | <sub-test> || <unknown> ] \n
 		}
 		token plan {
-			'1..' $<count>=[\d+] [ '#' <.ws>* $<directive>=[:i 'SKIP'] \S+ <.ws>+ $<explanation>=[\N*] ]?
+			'1..' <count=.num> [ '#' <.ws>* $<directive>=[:i 'SKIP'] \S+ <.ws>+ $<explanation>=[\N*] ]?
 		}
 		regex description {
 			[ <-[\n\#\\]> | \\<[\\#]> ]+ <!after \s+>
 		}
 		token test {
-			$<nok>=['not '?] 'ok' [ <.ws> $<num>=[\d+] ]? ' -'?
+			$<nok>=['not '?] 'ok' [ <.ws> <num> ]? ' -'?
 				[ <.ws>+ <description> ]?
 				[ <.ws>* '#' <.ws>* $<directive>=[:i [ 'SKIP' | 'TODO'] \S* ] <.ws>+ $<explanation>=[\N*] ]?
 				<.ws>*
@@ -32,7 +33,7 @@ package TAP {
 			'Bail out!' [ <.ws> $<explanation>=[\N*] ]?
 		}
 		token version {
-			:i 'TAP version ' $<version>=[\d+]
+			:i 'TAP version ' <version=.num>
 		}
 		token comment {
 			'#' <.ws>* $<comment>=[\N*]
