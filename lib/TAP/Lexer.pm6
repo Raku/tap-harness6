@@ -12,31 +12,31 @@ package TAP {
 			callsame;
 		}
 		token TOP { ^ <line>+ $ }
-		token ws { <[\s] - [\n]> }
+		token sp { <[\s] - [\n]> }
 		token num { <[0..9]>+ }
 		token line {
 			^^ [ <plan> | <test> | <bailout> | <version> | <comment> | <yaml> | <sub-test> || <unknown> ] \n
 		}
 		token plan {
-			'1..' <count=.num> [ '#' <.ws>* $<directive>=[:i 'SKIP'] \S+ <.ws>+ $<explanation>=[\N*] ]?
+			'1..' <count=.num> [ '#' <.sp>* $<directive>=[:i 'SKIP'] <.alnum>+ <.sp>+ $<explanation>=[\N*] ]?
 		}
 		regex description {
-			[ <-[\n\#\\]> | \\<[\\#]> ]+ <!after \s+>
+			[ <-[\n\#\\]> | \\<[\\#]> ]+ <!after <sp>+>
 		}
 		token test {
-			$<nok>=['not '?] 'ok' [ <.ws> <num> ]? ' -'?
-				[ <.ws>+ <description> ]?
-				[ <.ws>* '#' <.ws>* $<directive>=[:i [ 'SKIP' | 'TODO'] \S* ] <.ws>+ $<explanation>=[\N*] ]?
-				<.ws>*
+			$<nok>=['not '?] 'ok' [ <.sp> <num> ]? ' -'?
+				[ <.sp>+ <description> ]?
+				[ <.sp>* '#' <.sp>* $<directive>=[:i [ 'SKIP' | 'TODO'] <.alnum>* ] <.sp>+ $<explanation>=[\N*] ]?
+				<.sp>*
 		}
 		token bailout {
-			'Bail out!' [ <.ws> $<explanation>=[\N*] ]?
+			'Bail out!' [ <.sp> $<explanation>=[\N*] ]?
 		}
 		token version {
 			:i 'TAP version ' <version=.num>
 		}
 		token comment {
-			'#' <.ws>* $<comment>=[\N*]
+			'#' <.sp>* $<comment>=[\N*]
 		}
 		token yaml {
 			$<yaml-indent>=['  '] '---' \n :
@@ -44,7 +44,7 @@ package TAP {
 			<.indent> $<yaml-indent> '...'
 		}
 		token sub-entry {
-			<plan> | <test> | <comment> | <yaml> | <sub-test> || <!before <.ws>+ > <unknown>
+			<plan> | <test> | <comment> | <yaml> | <sub-test> || <!before <sp>+ > <unknown>
 		}
 		token indent {
 			'    ' ** { $*tap-indent }
@@ -102,8 +102,7 @@ package TAP {
 			make $/.values[0].ast;
 		}
 		method sub-test($/) {
-			my @entries = @<sub-entry>».ast;
-			make TAP::Sub-Test.new(:raw($/.Str), :@entries, |self!make_test($<test>));
+			make TAP::Sub-Test.new(:raw($/.Str), :entries(@<sub-entry>».ast), |self!make_test($<test>));
 		}
 		method unknown($/) {
 			make TAP::Unknown.new(:raw($/.Str));
