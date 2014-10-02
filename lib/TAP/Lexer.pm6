@@ -72,14 +72,15 @@ package TAP {
 			}
 			make TAP::Plan.new(|%args);
 		}
+		method description($/) {
+			make ~$/.subst(/\\('#'|'\\')/, -> $/ { $0 }, :g)
+		}
 		method !make_test($/) {
 			my %args = (:ok(!$<nok>.Str));
 			%args<number> = $<num>.defined ?? $<num>.Int !! Int;
+			%args<description> = $<description>.ast if $<description>;
 			%args<directive> = $<directive> ?? TAP::Directive::{$<directive>.Str.substr(0,4).tclc} !! TAP::No-Directive;
 			%args<explanation> = ~$<explanation> if $<explanation>;
-			if $<description> {
-				%args<description> = $<description>.Str.subst(/\\('#'|'\\')/, $0, :g);
-			}
 			return %args;
 		}
 		method test($/) {
