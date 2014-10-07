@@ -12,5 +12,5 @@ my $result = $parser.result;
 
 is $result.tests-planned, 2;
 is $result.tests-run, 2;
-is-deeply $result.passed, [ 1 ];
-is-deeply $result.failed, [ 2 ];
+is-deeply [@( $result.passed.list )], [ 1 ];
+is-deeply [@( $result.failed.list )], [ 2 ];
