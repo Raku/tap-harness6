@@ -25,71 +25,71 @@ package TAP::Parser {
 		has Promise $.done = Promise.new;
 		has Int $!version;
 
-		method handle-entry(TAP::Entry $entry) {
-			given $entry {
-				when TAP::Version {
-					if $!seen-lines {
-						self!add-error('Seen version declaration mid-stream');
-					}
-					elsif $entry.version !~~ $!allowed-versions {
-						self!add-error("Version must be in range $!allowed-versions");
-					}
-					else {
-						$!version = $entry.version;
-					}
-				}
-				when TAP::Plan {
-					if $!seen-plan {
-						self!add-error('Seen a second plan');
-					}
-					else {
-						$!tests-planned = $entry.tests;
-						$!seen-plan = $!tests-run ?? After !! Before;
-						$!skip-all = $entry.skip-all;
-					}
-				}
-				when TAP::Test {
-					my $found-number = $entry.number;
-					my $expected-number = ++$!tests-run;
-					if $found-number.defined && ($found-number != $expected-number) {
-						self!add-error("Tests out of sequence.  Found ($found-number) but expected ($expected-number)");
-					}
-					if $!seen-plan == After {
-						self!add-error("Plan must be at the beginning or end of the TAP output");
-					}
-					my $usable-number = $found-number // $expected-number;
-					($entry.is-ok ?? @!passed !! @!failed).push($usable-number);
-					($entry.ok ?? @!actual-passed !! @!actual-failed).push($usable-number);
-					@!todo.push($usable-number) if $entry.directive ~~ TAP::Todo;
-					@!todo-passed.push($usable-number) if $entry.ok && $entry.directive == TAP::Todo;
-					@!skipped.push($usable-number) if $entry.directive == TAP::Skip;
-					when TAP::Sub-Test {
-						for $entry.inconsistencies(~$usable-number) -> $error {
-							self!add-error($error);
-						}
-					}
-				}
-				when TAP::Bailout {
-					if $!bailout.defined {
-						$!bailout.keep($entry);
-					}
-					else {
-						$!.done.break($entry);
-					}
-				}
-				when TAP::Comment {
-				}
-				when TAP::Unknown {
-					$!unknowns++;
-				}
-				default {
-					if $!seen-plan == After {
-						self!add-error("Got line {$/.Str} after late plan");
-					}
-				}
+		proto method handle-entry(TAP::Entry $entry) {
+			if $!seen-plan == After && $entry !~~ TAP::Comment {
+				self!add-error("Got line $entry after late plan");
 			}
+			{*};
 			$!seen-lines++;
 		}
+		multi method handle-entry(TAP::Version $entry) {
+			if $!seen-lines {
+				self!add-error('Seen version declaration mid-stream');
+			}
+			elsif $entry.version !~~ $!allowed-versions {
+				self!add-error("Version must be in range $!allowed-versions");
+			}
+			else {
+				$!version = $entry.version;
+			}
+		}
+		multi method handle-entry(TAP::Plan $plan) {
+			if $!seen-plan {
+				self!add-error('Seen a second plan');
+			}
+			else {
+				$!tests-planned = $plan.tests;
+				$!seen-plan = $!tests-run ?? After !! Before;
+				$!skip-all = $plan.skip-all;
+			}
+		}
+		multi method handle-entry(TAP::Test $test) {
+			my $found-number = $test.number;
+			my $expected-number = ++$!tests-run;
+			if $found-number.defined && ($found-number != $expected-number) {
+				self!add-error("Tests out of sequence.  Found ($found-number) but expected ($expected-number)");
+			}
+			if $!seen-plan == After {
+				self!add-error("Plan must be at the beginning or end of the TAP output");
+			}
+
+			my $usable-number = $found-number // $expected-number;
+			($test.is-ok ?? @!passed !! @!failed).push($usable-number);
+			($test.ok ?? @!actual-passed !! @!actual-failed).push($usable-number);
+			@!todo.push($usable-number) if $test.directive == TAP::Todo;
+			@!todo-passed.push($usable-number) if $test.ok && $test.directive == TAP::Todo;
+			@!skipped.push($usable-number) if $test.directive == TAP::Skip;
+
+			if $test ~~ TAP::Sub-Test {
+				for $test.inconsistencies(~$usable-number) -> $error {
+					self!add-error($error);
+				}
+			}
+		}
+		multi method handle-entry(TAP::Bailout $entry) {
+			if $!bailout.defined {
+				$!bailout.keep($entry);
+			}
+			else {
+				$!done.break($entry);
+			}
+		}
+		multi method handle-entry(TAP::Unknown $) {
+			$!unknowns++;
+		}
+		multi method handle-entry(TAP::Entry $entry) {
+		}
+
 		method end-entries() {
 			if !$!seen-plan {
 				self!add-error('No plan found in TAP output');
@@ -160,9 +160,8 @@ package TAP::Parser {
 			has @.args;
 			method run(Supply $output) {
 				my $process = Proc::Async.new($!path, @!args);
-				my $input = $process.stdout();
 				my $lexer = TAP::Lexer.new(:$output);
-				$input.act(-> $data { $lexer.add-data($data) }, :done({ $lexer.close-data() }));
+				$process.stdout().act(-> $data { $lexer.add-data($data) }, :done({ $lexer.close-data() }));
 				return Run.new(:done($process.start()), :$process);
 			}
 		}
