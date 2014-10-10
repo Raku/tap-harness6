@@ -66,7 +66,7 @@ package TAP {
 			make $/.values[0].ast;
 		}
 		method plan($/) {
-			my %args = :raw($/.Str), :tests($<count>.Int);
+			my %args = :raw(~$/), :tests(+$<count>);
 			if $<directive> {
 				%args<skip-all explanation> = True, $<explanation>;
 			}
@@ -76,37 +76,37 @@ package TAP {
 			make ~$/.subst(/\\('#'|'\\')/, -> $/ { $0 }, :g)
 		}
 		method !make_test($/) {
-			my %args = (:ok(!$<nok>.Str));
-			%args<number> = $<num>.defined ?? $<num>.Int !! Int;
+			my %args = (:ok($<nok> eq ''));
+			%args<number> = $<num>.defined ?? +$<num> !! Int;
 			%args<description> = $<description>.ast if $<description>;
-			%args<directive> = $<directive> ?? TAP::Directive::{$<directive>.Str.substr(0,4).tclc} !! TAP::No-Directive;
+			%args<directive> = $<directive> ?? TAP::Directive::{~$<directive>.substr(0,4).tclc} !! TAP::No-Directive;
 			%args<explanation> = ~$<explanation> if $<explanation>;
 			return %args;
 		}
 		method test($/) {
-			make TAP::Test.new(:raw($/.Str), |self!make_test($/));
+			make TAP::Test.new(:raw(~$/), |self!make_test($/));
 		}
 		method bailout($/) {
-			make TAP::Bailout.new(:raw($/.Str), :explanation($<explanation> ?? ~$<explanation> !! Str));
+			make TAP::Bailout.new(:raw(~$/), :explanation($<explanation> ?? ~$<explanation> !! Str));
 		}
 		method version($/) {
-			make TAP::Version.new(:raw($/.Str), :version($<version>.Int));
+			make TAP::Version.new(:raw(~$/), :version(+$<version>));
 		}
 		method comment($/) {
-			make TAP::Comment.new(:raw($/.Str), :comment($<comment>.Str));
+			make TAP::Comment.new(:raw(~$/), :comment(~$<comment>));
 		}
 		method yaml($/) {
 			my $content = $<yaml-line>.join('');
-			make TAP::YAML.new(:raw($/.Str), :$content);
+			make TAP::YAML.new(:raw(~$/), :$content);
 		}
 		method sub-entry($/) {
 			make $/.values[0].ast;
 		}
 		method sub-test($/) {
-			make TAP::Sub-Test.new(:raw($/.Str), :entries(@<sub-entry>».ast), |self!make_test($<test>));
+			make TAP::Sub-Test.new(:raw(~$/), :entries(@<sub-entry>».ast), |self!make_test($<test>));
 		}
 		method unknown($/) {
-			make TAP::Unknown.new(:raw($/.Str));
+			make TAP::Unknown.new(:raw(~$/));
 		}
 	}
 
