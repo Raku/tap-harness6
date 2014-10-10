@@ -60,10 +60,10 @@ package TAP {
 	}
 	class Action {
 		method TOP($/) {
-			make @<line>».ast;
+			make @<line>».made;
 		}
 		method line($/) {
-			make $/.values[0].ast;
+			make $/.values[0].made;
 		}
 		method plan($/) {
 			my %args = :raw(~$/), :tests(+$<count>);
@@ -78,7 +78,7 @@ package TAP {
 		method !make_test($/) {
 			my %args = (:ok($<nok> eq ''));
 			%args<number> = $<num>.defined ?? +$<num> !! Int;
-			%args<description> = $<description>.ast if $<description>;
+			%args<description> = $<description>.made if $<description>;
 			%args<directive> = $<directive> ?? TAP::Directive::{~$<directive>.substr(0,4).tclc} !! TAP::No-Directive;
 			%args<explanation> = ~$<explanation> if $<explanation>;
 			return %args;
@@ -100,10 +100,10 @@ package TAP {
 			make TAP::YAML.new(:raw(~$/), :$content);
 		}
 		method sub-entry($/) {
-			make $/.values[0].ast;
+			make $/.values[0].made;
 		}
 		method sub-test($/) {
-			make TAP::Sub-Test.new(:raw(~$/), :entries(@<sub-entry>».ast), |self!make_test($<test>));
+			make TAP::Sub-Test.new(:raw(~$/), :entries(@<sub-entry>».made), |self!make_test($<test>));
 		}
 		method unknown($/) {
 			make TAP::Unknown.new(:raw(~$/));
@@ -119,7 +119,7 @@ package TAP {
 		submethod BUILD(Supply:D :$!output) { }
 		method add-data(Str $data) {
 			$!buffer ~= $data;
-			while ($!grammar.subparse($!buffer, :actions($!actions))) -> $match {
+			while ($!grammar.subparse($!buffer, :$!actions)) -> $match {
 				$!buffer.=substr($match.to);
 				for @($match.made) -> $result {
 					$!output.more($result);
