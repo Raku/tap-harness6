@@ -73,7 +73,7 @@ package TAP {
 			make TAP::Plan.new(|%args);
 		}
 		method description($/) {
-			make ~$/.subst(/\\('#'|'\\')/, -> $/ { $0 }, :g)
+			make ~$/.subst(/\\('#'|'\\')/, { $_[0] }, :g)
 		}
 		method !make_test($/) {
 			my %args = (:ok($<nok> eq ''));

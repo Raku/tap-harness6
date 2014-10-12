@@ -118,7 +118,7 @@ package TAP::Parser {
 				my $entries = Supply.new;
 				my $state = State.new(:$bailout);
 				for $state, @handlers -> $handler {
-					$entries.act(-> $entry { $handler.handle-entry($entry) }, :done(-> { $handler.end-entries() }));
+					$entries.act({ $handler.handle-entry($^entry) }, :done({ $handler.end-entries() }));
 				}
 				my $run = self.run($entries);
 				return Async.new(:$!name, :$state, :$run);
@@ -161,7 +161,7 @@ package TAP::Parser {
 			method run(Supply $output) {
 				my $process = Proc::Async.new($!path, @!args);
 				my $lexer = TAP::Lexer.new(:$output);
-				$process.stdout().act(-> $data { $lexer.add-data($data) }, :done({ $lexer.close-data() }));
+				$process.stdout().act({ $lexer.add-data($^data) }, :done({ $lexer.close-data() }));
 				return Run.new(:done($process.start()), :$process);
 			}
 		}
@@ -197,9 +197,9 @@ package TAP::Parser {
 				for @!entries -> $entry {
 					$output.more($entry);
 				}
-				$!input.act(-> $entry {
-					$output.more($entry);
-					@!entries.push($entry);
+				$!input.act({
+					$output.more($^entry);
+					@!entries.push($^entry);
 				}, :done({ $output.done() }));
 				return Run.new(:done($!input.Promise));
 			}

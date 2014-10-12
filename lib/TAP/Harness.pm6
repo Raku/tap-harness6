@@ -38,7 +38,7 @@ class TAP::Harness {
 			for @!sources -> $name {
 				last if $kill;
 				my $session = $formatter.open-test($name);
-				my $parser = @!handlers.max(*.can-handle($name)).make-async-parser(:$name, :handlers([$session]), :$kill);
+				my $parser = @!handlers.max(*.can-handle($name)).make-async-parser(:$name, :handlers[$session], :$kill);
 				@working.push({ :$parser, :$session, :done($parser.done) });
 				next if @working < $jobs;
 				await Promise.anyof(@working»<done>, $kill);
