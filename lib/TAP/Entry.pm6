@@ -75,7 +75,7 @@ package TAP {
 		}
 	}
 	class Comment does Entry {
-		has Str $.comment = !!! 'comment is required';
+		has Str:D $.comment;
 		method to-string {
 			return "# $!comment";
 		}

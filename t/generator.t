@@ -2,7 +2,7 @@ use TAP::Parser;
 use TAP::Entry;
 use TAP::Generator;
 
-my $source = TAP::Parser::Async::Source::Through.new(:name("Self-Testing"));
+my $source = TAP::Parser::Async::Source::Through.new(:name<Self-Testing>);
 my $parser = $source.make-parser();
 my $elements = TAP::Collector.new();
 my $g = TAP::Generator.new(:output(TAP::Entry::Handler::Multi.new(:handlers($source, $elements))));
