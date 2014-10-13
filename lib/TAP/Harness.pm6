@@ -30,7 +30,7 @@ class TAP::Harness {
 		}
 	}
 
-	method run(Int :$jobs = 1, TAP::Formatter :$formatter = $!formatter-class.new(:parallel($jobs > 1), :names(@.sources))) {
+	method run(Int :$jobs = 1, Bool :$timer = False, TAP::Formatter :$formatter = $!formatter-class.new(:parallel($jobs > 1), :names(@.sources), :$timer)) {
 		my @working;
 		my $kill = Promise.new;
 		my $aggregator = TAP::Aggregator.new();

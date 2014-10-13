@@ -15,6 +15,7 @@ package TAP {
 		has Int $.unknowns;
 		has Bool $.skip-all;
 		has Proc::Status $.exit-status;
+		has Duration $.time;
 		method exit() {
 			$!exit-status.defined ?? $!exit-status.exit !! Int;
 		}

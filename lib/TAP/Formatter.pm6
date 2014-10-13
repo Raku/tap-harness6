@@ -11,14 +11,16 @@ package TAP {
 	role Formatter::Text does Formatter {
 		has Bool $.parallel;
 		has Formatter::Volume $.volume;
+		has Bool $.timer;
 
 		has Int $!longest;
-		method BUILD(:$!parallel, :$!volume = Normal, :@names) {
+		method BUILD(:$!parallel, :$!volume = Normal, :$!timer = False, :@names) {
 			$!longest = @names ?? @names».chars.max !! 12;
 		}
 		method format-name($name) {
 			my $periods = '.' x ( $!longest + 2 - $name.chars);
-			return "$name $periods";
+			my @now = $!timer ?? ~DateTime.new(now, :formatter{ '[' ~ .hour ~ ':' ~ .minute ~ ':' ~ .second.Int ~ ']' }) !! Nil;
+			return (@now, $name, $periods).join(' ');
 		}
 		method summarize(TAP::Aggregator $aggregator, Bool $interrupted) {
 			my @tests = $aggregator.descriptions;
@@ -137,7 +139,8 @@ package TAP {
 				self.output-test-failure($result);
 			}
 			else {
-				self.output-return("$!pretty ok\n");
+				my $time = $!formatter.timer && $result.time ?? sprintf ' %8d ms', Int($result.time * 1000) !! '';
+				self.output-return("$!pretty ok$time\n");
 			}
 		}
 	}

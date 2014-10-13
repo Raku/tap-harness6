@@ -101,9 +101,9 @@ package TAP::Parser {
 			}
 			$!done.keep;
 		}
-		method finalize(Str $name, Proc::Status $exit-status) {
+		method finalize(Str $name, Proc::Status $exit-status, Duration $time) {
 			return TAP::Result.new(:$name, :$!tests-planned, :$!tests-run, :@!passed, :@!failed, :@!errors, :$!skip-all,
-				:@!actual-passed, :@!actual-failed, :@!todo, :@!todo-passed, :@!skipped, :$!unknowns, :$exit-status);
+				:@!actual-passed, :@!actual-failed, :@!todo, :@!todo-passed, :@!skipped, :$!unknowns, :$exit-status, :$time);
 		}
 		method !add-error(Str $error) {
 			push @!errors, $error;
@@ -127,11 +127,15 @@ package TAP::Parser {
 		class Run {
 			has Any $!process where *.can('kill');
 			has Promise:D $.done;
+			has Promise $.timer;
 			method kill() {
 				$!process.kill if $!process;
 			}
 			method exit-status() {
-				$.done && $.done.result ~~ Proc::Status ?? $.done.result !! Proc::Status;
+				return $!done.result ~~ Proc::Status ?? $.done.result !! Proc::Status;
+			}
+			method time() {
+				return $!timer.defined ?? $!timer.result !! Duration;
 			}
 		}
 
@@ -152,7 +156,7 @@ package TAP::Parser {
 		has TAP::Result $!result;
 		method result {
 			await $!done;
-			return $!result //= $!state.finalize($!name, $!run.exit-status);
+			return $!result //= $!state.finalize($!name, $!run.exit-status, $!run.time);
 		}
 
 		class Source::Proc does Source {
@@ -162,7 +166,10 @@ package TAP::Parser {
 				my $process = Proc::Async.new($!path, @!args);
 				my $lexer = TAP::Lexer.new(:$output);
 				$process.stdout().act({ $lexer.add-data($^data) }, :done({ $lexer.close-data() }));
-				return Run.new(:done($process.start()), :$process);
+				my $done = $process.start();
+				my $start-time = now;
+				my $timer = $done.then({ now - $start-time });
+				return Run.new(:$done, :$process, :$timer);
 			}
 		}
 		class Source::File does Source {
