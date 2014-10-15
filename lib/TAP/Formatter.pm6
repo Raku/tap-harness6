@@ -161,26 +161,26 @@ package TAP {
 			has Int $!last-updated = 0;
 			has Str $!planstr = '/?';
 			has Int $!number = 0;
-			method handle-entry(TAP::Entry $entry) {
+			proto method handle-entry(TAP::Entry $entry) {
 				#$.formatter.output($entry.perl ~ "\n");
-				given $entry {
-					when TAP::Bailout {
-						self.failure-output("Bailout called.  Further testing stopped:  {$entry.explanation}\n");
-					}
-					when TAP::Plan {
-						$!plan = $entry;
-						$!planstr = '/' ~ $entry.tests;
-					}
-					when TAP::Test {
-						my $now = time;
-						if $!last-updated != $now {
-							$!last-updated = $now;
-							self.output-return(($!pretty, ++$!number, $!planstr).join(''));
-						}
-					}
-					when TAP::Comment {
-					}
+				{*};
+			}
+			multi method handle-entry(TAP::Bailout $bailout) {
+				my $explanation = $bailout.explanation // '';
+				self.failure-output("Bailout called.  Further testing stopped: $explanation\n");
+			}
+			multi method handle-entry(TAP::Plan $!plan) {
+				$!planstr = '/' ~ $!plan.tests;
+			}
+			multi method handle-entry(TAP::Test $test) {
+				my $now = time;
+				++$!number;
+				if $!last-updated != $now {
+					$!last-updated = $now;
+					self.output-return(($!pretty, $test.number // $!number, $!planstr).join(''));
 				}
+			}
+			multi method handle-entry(TAP::Entry $) {
 			}
 			method output(Str $output) {
 				$!formatter.output($output);
