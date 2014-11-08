@@ -15,7 +15,7 @@ class TAP::Harness {
 			return 0.5;
 		}
 		method make-async-source($name) {
-			return TAP::Parser::Async::Source::Proc.new(:$name, :path($*EXECUTABLE), :args([$name]));
+			return TAP::Parser::Async::Source::Proc.new(:$name, :path($*EXECUTABLE), :args[$name]);
 		}
 	}
 

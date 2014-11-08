@@ -93,11 +93,9 @@ package TAP::Parser {
 		method end-entries() {
 			if !$!seen-plan {
 				self!add-error('No plan found in TAP output');
-				if $!tests-run != ($!tests-planned || 0) {
-					if defined $!tests-planned {
-						self!add-error("Bad plan.  You planned $!tests-planned tests but ran $!tests-run.");
-					}
-				}
+			}
+			elsif $!tests-run != $!tests-planned {
+				self!add-error("Bad plan.  You planned $!tests-planned tests but ran $!tests-run.");
 			}
 			$!done.keep;
 		}
