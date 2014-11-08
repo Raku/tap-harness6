@@ -81,7 +81,8 @@ done-testing();
 
 my $i;
 sub parse-and-get($content, :$tests-planned, :$tests-run, :$passed, :$failed, :$todo-passed, :$skipped, :$unknowns, :@errors = Array, :$name = "Test-{ ++$i }") {
-	my $parser = TAP::Parser::Async::Source::String.new(:$name, :$content).make-parser();
+	my $source = TAP::Parser::Source::String.new(:$name, :$content);
+	my $parser = TAP::Parser::Async.new(:$source);
 
 	my $result = $parser.result;
 	is($result.tests-planned, $tests-planned, "Expected $tests-planned planned tests in $name") if $tests-planned.defined;

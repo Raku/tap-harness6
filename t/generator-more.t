@@ -3,8 +3,8 @@ use TAP::Entry;
 
 use Test::More;
 
-my $source = TAP::Parser::Async::Source::Through.new(:name("Self-Testing"));
-my $parser = $source.make-parser();
+my $source = TAP::Parser::Source::Through.new(:name("Self-Testing"));
+my $parser = TAP::Parser::Async.new(:$source);
 my $elements = TAP::Collector.new();
 my $output = TAP::Entry::Handler::Multi.new(:handlers($source, $elements));
 

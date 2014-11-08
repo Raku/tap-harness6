@@ -6,7 +6,8 @@ class TAP::Harness {
 		method can-handle {...};
 		method make-async-source {...};
 		method make-async-parser(Any :$name, :@handlers, Promise :$bailout) {
-			self.make-async-source($name).make-parser(:@handlers :$bailout);
+			my $source = self.make-async-source($name);
+			return TAP::Parser::Async.new(:$source, :@handlers :$bailout);
 		}
 	}
 	class SourceHandler::Perl6 does SourceHandler {

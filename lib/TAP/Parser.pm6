@@ -110,35 +110,89 @@ package TAP::Parser {
 		}
 	}
 
-	class Async {
-		role Source {
-			has Str $.name;
-			method run(Supply) { ... }
-			method make-parser(:@handlers, Promise :$bailout) {
-				my $entries = Supply.new;
-				my $state = State.new(:$bailout);
-				for $state, @handlers -> $handler {
-					$entries.act({ $handler.handle-entry($^entry) }, :done({ $handler.end-entries() }));
-				}
-				my $run = self.run($entries);
-				return Async.new(:$!name, :$state, :$run);
-			}
-		}
-		class Run {
-			has Any $!process where *.can('kill');
-			has Promise:D $.done;
-			has Promise $.timer;
-			method kill() {
-				$!process.kill if $!process;
-			}
-			method exit-status() {
-				return $!done.result ~~ Proc::Status ?? $.done.result !! Proc::Status;
-			}
-			method time() {
-				return $!timer.defined ?? $!timer.result !! Duration;
-			}
-		}
+	class Async { ... }
 
+	role Source {
+		has Str $.name;
+		method run(Supply) { ... }
+		method make-parser(:@handlers, Promise :$promise) {
+			return Async.new(:source(self), :@handlers, :$promise);
+		}
+	}
+	my class Run {
+		has Any $!process where *.can('kill');
+		has Promise:D $.done;
+		has Promise $.timer;
+		method kill() {
+			$!process.kill if $!process;
+		}
+		method exit-status() {
+			return $!done.result ~~ Proc::Status ?? $.done.result !! Proc::Status;
+		}
+		method time() {
+			return $!timer.defined ?? $!timer.result !! Duration;
+		}
+	}
+	class Source::Proc does Source {
+		has IO::Path $.path;
+		has @.args;
+		method run(Supply $output) {
+			my $process = Proc::Async.new($!path, @!args);
+			my $lexer = TAP::Lexer.new(:$output);
+			$process.stdout().act({ $lexer.add-data($^data) }, :done({ $lexer.close-data() }));
+			my $done = $process.start();
+			my $start-time = now;
+			my $timer = $done.then({ now - $start-time });
+			return Run.new(:$done, :$process, :$timer);
+		}
+	}
+	class Source::File does Source {
+		has Str $.filename;
+
+		method run(Supply $output) {
+			my $lexer = TAP::Lexer.new(:$output);
+			return Run.new(:done(start {
+				$lexer.add-data($!filename.IO.slurp);
+				$lexer.close-data();
+			}));
+		}
+	}
+	class Source::String does Source {
+		has Str $.content;
+		method run(Supply $output) {
+			my $lexer = TAP::Lexer.new(:$output);
+			$lexer.add-data($!content);
+			sleep 1;
+			$lexer.close-data();
+			my $done = Promise.new;
+			$done.keep;
+			return Run.new(:$done);
+		}
+	}
+	class Source::Through does Source does TAP::Entry::Handler {
+		has Promise $.done = Promise.new;
+		has TAP::Entry @!entries;
+		has Supply $!input = Supply.new;
+		has Supply $!supply = Supply.new;
+		method run(Supply $output) {
+			for @!entries -> $entry {
+				$output.more($entry);
+			}
+			$!input.act({
+				$output.more($^entry);
+				@!entries.push($^entry);
+			}, :done({ $output.done() }));
+			return Run.new(:done($!input.Promise));
+		}
+		method handle-entry(TAP::Entry $entry) {
+			$!input.more($entry);
+		}
+		method end-entries() {
+			$!input.done();
+		}
+	}
+
+	class Async {
 		has Str $.name;
 		has Run $!run;
 		has State $!state;
@@ -146,6 +200,16 @@ package TAP::Parser {
 
 		submethod BUILD(Str :$!name, State :$!state, Run :$!run) {
 			$!done = Promise.allof($!state.done, $!run.done);
+		}
+
+		method new(Source :$source, :@handlers, Promise :$bailout) {
+			my $entries = Supply.new;
+			my $state = State.new(:$bailout);
+			for $state, @handlers -> $handler {
+				$entries.act({ $handler.handle-entry($^entry) }, :done({ $handler.end-entries() }));
+			}
+			my $run = $source.run($entries);
+			return Async.bless(:name($source.name), :$state, :$run);
 		}
 
 		method kill() {
@@ -159,63 +223,5 @@ package TAP::Parser {
 			return $!result //= $!state.finalize($!name, $!run.exit-status, $!run.time);
 		}
 
-		class Source::Proc does Source {
-			has IO::Path $.path;
-			has @.args;
-			method run(Supply $output) {
-				my $process = Proc::Async.new($!path, @!args);
-				my $lexer = TAP::Lexer.new(:$output);
-				$process.stdout().act({ $lexer.add-data($^data) }, :done({ $lexer.close-data() }));
-				my $done = $process.start();
-				my $start-time = now;
-				my $timer = $done.then({ now - $start-time });
-				return Run.new(:$done, :$process, :$timer);
-			}
-		}
-		class Source::File does Source {
-			has Str $.filename;
-
-			method run(Supply $output) {
-				my $lexer = TAP::Lexer.new(:$output);
-				return Run.new(:done(start {
-					$lexer.add-data($!filename.IO.slurp);
-					$lexer.close-data();
-				}));
-			}
-		}
-		class Source::String does Source {
-			has Str $.content;
-			method run(Supply $output) {
-				my $lexer = TAP::Lexer.new(:$output);
-				$lexer.add-data($!content);
-				sleep 1;
-				$lexer.close-data();
-				my $done = Promise.new;
-				$done.keep;
-				return Run.new(:$done);
-			}
-		}
-		class Source::Through does Source does TAP::Entry::Handler {
-			has Promise $.done = Promise.new;
-			has TAP::Entry @!entries;
-			has Supply $!input = Supply.new;
-			has Supply $!supply = Supply.new;
-			method run(Supply $output) {
-				for @!entries -> $entry {
-					$output.more($entry);
-				}
-				$!input.act({
-					$output.more($^entry);
-					@!entries.push($^entry);
-				}, :done({ $output.done() }));
-				return Run.new(:done($!input.Promise));
-			}
-			method handle-entry(TAP::Entry $entry) {
-				$!input.more($entry);
-			}
-			method end-entries() {
-				$!input.done();
-			}
-		}
 	}
 }
