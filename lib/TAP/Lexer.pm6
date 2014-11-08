@@ -112,7 +112,7 @@ package TAP {
 
 	class Lexer {
 		has Str $!buffer = '';
-		our subset Output of Any:D where *.can('more');
+		our subset Output of Any:D where *.can('emit');
 		has Output $!output;
 		has Grammar $!grammar = Grammar.new;
 		has Action $!actions = Action.new;
@@ -122,7 +122,7 @@ package TAP {
 			while ($!grammar.subparse($!buffer, :$!actions)) -> $match {
 				$!buffer.=substr($match.to);
 				for @($match.made) -> $result {
-					$!output.more($result);
+					$!output.emit($result);
 				}
 			}
 		}

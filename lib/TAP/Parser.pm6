@@ -174,16 +174,16 @@ package TAP::Parser {
 		has Supply $!supply = Supply.new;
 		method run(Supply $output) {
 			for @!entries -> $entry {
-				$output.more($entry);
+				$output.emit($entry);
 			}
 			$!input.act({
-				$output.more($^entry);
+				$output.emit($^entry);
 				@!entries.push($^entry);
 			}, :done({ $output.done() }));
 			return Run.new(:done($!input.Promise));
 		}
 		method handle-entry(TAP::Entry $entry) {
-			$!input.more($entry);
+			$!input.emit($entry);
 		}
 		method end-entries() {
 			$!input.done();
