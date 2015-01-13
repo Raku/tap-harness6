@@ -1,4 +1,4 @@
-use TAP::Parser;
+use TAP::Runner;
 use Test::More;
 
 my $content1 = q:heredoc/END/;
@@ -81,8 +81,8 @@ done-testing();
 
 my $i;
 sub parse-and-get($content, :$tests-planned, :$tests-run, :$passed, :$failed, :$todo-passed, :$skipped, :$unknowns, :@errors = Array, :$name = "Test-{ ++$i }") {
-	my $source = TAP::Parser::Source::String.new(:$name, :$content);
-	my $parser = TAP::Parser::Async.new(:$source);
+	my $source = TAP::Runner::Source::String.new(:$name, :$content);
+	my $parser = TAP::Runner::Async.new(:$source);
 
 	my $result = $parser.result;
 	is($result.tests-planned, $tests-planned, "Expected $tests-planned planned tests in $name") if $tests-planned.defined;

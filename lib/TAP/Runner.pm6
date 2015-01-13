@@ -2,7 +2,7 @@ use TAP::Lexer;
 use TAP::Entry;
 use TAP::Result;
 
-package TAP::Parser {
+package TAP::Runner {
 	class State does TAP::Entry::Handler {
 		has Range $.allowed-versions = 12 .. 13;
 		has Int $!tests-planned;

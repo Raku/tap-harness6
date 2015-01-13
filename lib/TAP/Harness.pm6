@@ -1,4 +1,4 @@
-use TAP::Parser;
+use TAP::Runner;
 use TAP::Formatter;
 
 class TAP::Harness {
@@ -7,7 +7,7 @@ class TAP::Harness {
 		method make-async-source {...};
 		method make-async-parser(Any :$name, :@handlers, Promise :$bailout) {
 			my $source = self.make-async-source($name);
-			return TAP::Parser::Async.new(:$source, :@handlers :$bailout);
+			return TAP::Runner::Async.new(:$source, :@handlers :$bailout);
 		}
 	}
 	class SourceHandler::Perl6 does SourceHandler {
@@ -15,7 +15,7 @@ class TAP::Harness {
 			return 0.5;
 		}
 		method make-async-source($name) {
-			return TAP::Parser::Source::Proc.new(:$name, :path($*EXECUTABLE), :args[$name]);
+			return TAP::Runner::Source::Proc.new(:$name, :path($*EXECUTABLE), :args[$name]);
 		}
 	}
 
