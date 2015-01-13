@@ -102,7 +102,7 @@ sub lex-and-get($content) {
 	my $output = Supply.new;
 	my @ret;
 	$output.act: -> $entry { @ret.push: $entry };
-	my $lexer = TAP::Lexer.new(:$output);
+	my $lexer = TAP::Parser.new(:$output);
 	$lexer.add-data($content);
 	$lexer.close-data();
 	return @ret;

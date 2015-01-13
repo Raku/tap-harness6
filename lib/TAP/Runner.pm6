@@ -1,4 +1,4 @@
-use TAP::Lexer;
+use TAP::Parser;
 use TAP::Entry;
 use TAP::Result;
 
@@ -136,7 +136,7 @@ package TAP::Runner {
 		has @.args;
 		method run(Supply $output) {
 			my $process = Proc::Async.new($!path, @!args);
-			my $lexer = TAP::Lexer.new(:$output);
+			my $lexer = TAP::Parser.new(:$output);
 			$process.stdout().act({ $lexer.add-data($^data) }, :done({ $lexer.close-data() }));
 			my $done = $process.start();
 			my $start-time = now;
@@ -148,7 +148,7 @@ package TAP::Runner {
 		has Str $.filename;
 
 		method run(Supply $output) {
-			my $lexer = TAP::Lexer.new(:$output);
+			my $lexer = TAP::Parser.new(:$output);
 			return Run.new(:done(start {
 				$lexer.add-data($!filename.IO.slurp);
 				$lexer.close-data();
@@ -158,7 +158,7 @@ package TAP::Runner {
 	class Source::String does Source {
 		has Str $.content;
 		method run(Supply $output) {
-			my $lexer = TAP::Lexer.new(:$output);
+			my $lexer = TAP::Parser.new(:$output);
 			$lexer.add-data($!content);
 			sleep 1;
 			$lexer.close-data();

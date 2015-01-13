@@ -110,7 +110,7 @@ package TAP {
 		}
 	}
 
-	class Lexer {
+	class Parser {
 		has Str $!buffer = '';
 		our subset Output of Any:D where *.can('emit');
 		has Output $!output;
