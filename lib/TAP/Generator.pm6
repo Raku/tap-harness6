@@ -4,12 +4,13 @@ package TAP {
 	class Generator { ... }
 	class Context::Sub { ... }
 	role Context does TAP::Entry::Handler {
+		has Int $.version;
 		has Int $.tests-expected;
 		has Int $.failed = 0;
 		has Int $.tests-seen = 0;
 		method emit(TAP::Entry) { ... }
 		method subtest(Str $description) {
-			return Context::Sub.new(:$description);
+			return Context::Sub.new(:$description, :$!version);
 		}
 		method handle-entry(TAP::Entry $entry) {
 			given ($entry) {
@@ -38,6 +39,10 @@ package TAP {
 		method emit(TAP::Entry $entry) {
 			$!output.handle-entry($entry);
 		}
+		method new(:$output, :$version) {
+			$!output.handle-entry(TAP::Version.new($version)) if $version > 12;
+			self.bless(:$output, :$version);
+		}
 	}
 	my class Context::Sub does Context {
 		has Str $.description;
@@ -56,13 +61,11 @@ package TAP {
 		}
 	}
 	class Generator {
-		has Int $.version;
 		has TAP::Entry::Handler:D $.output;
 		has Context @!constack;
 		has Context $!context handles <tests-seen>;
-		submethod BUILD(TAP::Entry::Handler :$!output, Int :$!version = 12) {
-			$!context = Context::Main.new(:$!output);
-			$!output.handle-entry(TAP::Version.new($!version)) if $!version > 12;
+		submethod BUILD(TAP::Entry::Handler :$!output, Int :$version = 12) {
+			$!context = Context::Main.new(:$!output, :$version);
 		}
 
 		multi method plan(Int $tests) {
