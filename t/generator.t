@@ -41,7 +41,7 @@ my @expected =
 	TAP::Test,
 ;
 
-for $elements.entries Z @expected -> $got, $expected {
+for $elements.entries Z @expected -> ($got, $expected) {
 	my $ok = $got ~~ $expected;
 	$h.test(:$ok, :description("Expected a " ~ $expected.WHAT.perl));
 	if !$ok {
