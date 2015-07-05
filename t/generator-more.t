@@ -1,4 +1,4 @@
-use TAP::Runner;
+use TAP::Harness;
 use TAP::Entry;
 
 use Test::More;

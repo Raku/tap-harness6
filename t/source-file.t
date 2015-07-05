@@ -1,5 +1,6 @@
 use v6;
-use TAP::Runner;
+use TAP::Parser;
+use TAP::Harness;
 
 use Test::More;
 

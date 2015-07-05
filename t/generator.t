@@ -1,4 +1,5 @@
-use TAP::Runner;
+#! perl6
+use TAP::Harness;
 use TAP::Entry;
 use TAP::Generator;
 
