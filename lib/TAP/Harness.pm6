@@ -100,7 +100,7 @@ package TAP::Runner {
 			}
 			$!done.keep;
 		}
-		method finalize(Str $name, Proc::Status $exit-status, Duration $time) {
+		method finalize(Str $name, Proc $exit-status, Duration $time) {
 			return TAP::Result.new(:$name, :$!tests-planned, :$!tests-run, :@!passed, :@!failed, :@!errors, :$!skip-all,
 				:@!actual-passed, :@!actual-failed, :@!todo, :@!todo-passed, :@!skipped, :$!unknowns, :$exit-status, :$time);
 		}
@@ -127,7 +127,7 @@ package TAP::Runner {
 			$!process.kill if $!process;
 		}
 		method exit-status() {
-			return $!done.result ~~ Proc::Status ?? $.done.result !! Proc::Status;
+			return $!done.result ~~ Proc ?? $.done.result !! Proc;
 		}
 		method time() {
 			return $!timer.defined ?? $!timer.result !! Duration;
