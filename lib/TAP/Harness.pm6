@@ -113,7 +113,6 @@ package TAP::Runner {
 
 	role Source {
 		has Str $.name;
-		method run(Supply) { ... }
 		method make-parser(:@handlers, Promise :$promise) {
 			return Async.new(:source(self), :@handlers, :$promise);
 		}
@@ -136,45 +135,20 @@ package TAP::Runner {
 	class Source::Proc does Source {
 		has IO::Path $.path;
 		has @.args;
-		method run(Supply $output) {
-			my $process = Proc::Async.new($!path, @!args);
-			my $lexer = TAP::Parser.new(:$output);
-			$process.stdout().act({ $lexer.add-data($^data) }, :done({ $lexer.close-data() }));
-			my $done = $process.start();
-			my $start-time = now;
-			my $timer = $done.then({ now - $start-time });
-			return Run.new(:$done, :$process, :$timer);
-		}
 	}
 	class Source::File does Source {
 		has Str $.filename;
-
-		method run(Supply $output) {
-			my $lexer = TAP::Parser.new(:$output);
-			return Run.new(:done(start {
-				$lexer.add-data($!filename.IO.slurp);
-				$lexer.close-data();
-			}));
-		}
 	}
 	class Source::String does Source {
 		has Str $.content;
-		method run(Supply $output) {
-			my $lexer = TAP::Parser.new(:$output);
-			$lexer.add-data($!content);
-			sleep 1;
-			$lexer.close-data();
-			my $done = Promise.new;
-			$done.keep;
-			return Run.new(:$done);
-		}
 	}
 	class Source::Through does Source does TAP::Entry::Handler {
 		has Promise $.done = Promise.new;
 		has TAP::Entry @!entries;
 		has Supply $!input = Supply.new;
 		has Supply $!supply = Supply.new;
-		method run(Supply $output) {
+		has Promise $.promise = $!input.Promise;
+		method staple(Supply $output) {
 			for @!entries -> $entry {
 				$output.emit($entry);
 			}
@@ -182,7 +156,6 @@ package TAP::Runner {
 				$output.emit($^entry);
 				@!entries.push($^entry);
 			}, :done({ $output.done() }));
-			return Run.new(:done($!input.Promise));
 		}
 		method handle-entry(TAP::Entry $entry) {
 			$!input.emit($entry);
@@ -202,13 +175,43 @@ package TAP::Runner {
 			$!done = Promise.allof($!state.done, $!run.done);
 		}
 
+		multi get_runner(Source::Proc $proc; Supply $output) {
+			my $process = Proc::Async.new($proc.path, $proc.args);
+			my $lexer = TAP::Parser.new(:$output);
+			$process.stdout().act({ $lexer.add-data($^data) }, :done({ $lexer.close-data() }));
+			my $done = $process.start();
+			my $start-time = now;
+			my $timer = $done.then({ now - $start-time });
+			return Run.new(:$done, :$process, :$timer);
+		}
+		multi get_runner(Source::Through $through; Supply $output) {
+			$through.staple($output);
+			return Run.new(:done($through.promise));
+		}
+		multi get_runner(Source::File $file; Supply $output) {
+			my $lexer = TAP::Parser.new(:$output);
+			return Run.new(:done(start {
+				$lexer.add-data($file.filename.IO.slurp);
+				$lexer.close-data();
+			}));
+		}
+		multi get_runner(Source::String $string; Supply $output) {
+			my $lexer = TAP::Parser.new(:$output);
+			$lexer.add-data($string.content);
+			sleep 1;
+			$lexer.close-data();
+			my $done = Promise.new;
+			$done.keep;
+			return Run.new(:$done);
+		}
+
 		method new(Source :$source, :@handlers, Promise :$bailout) {
 			my $entries = Supply.new;
 			my $state = State.new(:$bailout);
 			for $state, @handlers -> $handler {
 				$entries.act({ $handler.handle-entry($^entry) }, :done({ $handler.end-entries() }));
 			}
-			my $run = $source.run($entries);
+			my $run = get_runner($source, $entries);
 			return Async.bless(:name($source.name), :$state, :$run);
 		}
 
@@ -224,22 +227,61 @@ package TAP::Runner {
 		}
 
 	}
+
+	class Sync {
+		has Source $.source;
+		has @.handlers;
+		has Str $.name = $!source.name;
+
+		method run(Promise :$bailout) {
+			my $output = Supply.new;
+			my $state = State.new(:$bailout);
+			for $state, @!handlers -> $handler {
+				$output.act({ $handler.handle-entry($^entry) }, :done({ $handler.end-entries() }));
+			}
+			my $start-time = now;
+			given $!source {
+				when Source::Proc {
+					my $parser = TAP::Parser.new(:$output);
+					my $proc = run($!source.path, $!source.args, :out, :!chomp);
+					for $proc.out.lines -> $line {
+						$parser.add-data($line);
+					}
+					$parser.close-data();
+					return $state.finalize($!name, $proc, now - $start-time);
+				}
+				when Source::Through {
+					$!source.staple($output);
+					$!source.promise.result;
+					return $state.finalize($!name, Proc, now - $start-time);
+				}
+				when Source::File {
+					my $parser = TAP::Parser.new(:$output);
+					$parser.add-data($!source.filename.IO.slurp);
+					$parser.close-data();
+					return $state.finalize($!name, Proc, now - $start-time);
+				}
+				when Source::String {
+					my $parser = TAP::Parser.new(:$output);
+					$parser.add-data($!source.content);
+					$parser.close-data();
+					return $state.finalize($!name, Proc, now - $start-time);
+				}
+			}
+		}
+	}
 }
 
 class TAP::Harness {
 	role SourceHandler {
 		method can-handle {...};
-		method make-async-source {...};
-		method make-async-parser(Any :$name, :@handlers, Promise :$bailout) {
-			my $source = self.make-async-source($name);
-			return TAP::Runner::Async.new(:$source, :@handlers :$bailout);
-		}
+		method make-source {...};
 	}
 	class SourceHandler::Perl6 does SourceHandler {
 		method can-handle($name) {
 			return 0.5;
 		}
-		method make-async-source($name) {
+		method make-source($name) {
 			return TAP::Runner::Source::Proc.new(:$name, :path($*EXECUTABLE), :args[$name]);
 		}
 	}
@@ -260,35 +302,55 @@ class TAP::Harness {
 		my @working;
 		my $kill = Promise.new;
 		my $aggregator = TAP::Aggregator.new();
-		my $done = start {
-			for @!sources -> $name {
-				last if $kill;
-				my $session = $formatter.open-test($name);
-				my $parser = @!handlers.max(*.can-handle($name)).make-async-parser(:$name, :handlers[$session], :$kill);
-				@working.push({ :$parser, :$session, :done($parser.done) });
-				next if @working < $jobs;
-				await Promise.anyof(@working»<done>, $kill);
+		if $jobs > 1 {
+			my $done = start {
+				for @!sources -> $name {
+					last if $kill;
+					my $session = $formatter.open-test($name);
+					my $source = @!handlers.max(*.can-handle($name)).make-source($name);
+					my $parser = TAP::Runner::Async.new(:$source, :handlers[$session], :$kill);
+					@working.push({ :$parser, :$session, :done($parser.done) });
+					next if @working < $jobs;
+					await Promise.anyof(@working»<done>, $kill);
+					reap-finished();
+				}
+				await Promise.anyof(Promise.allof(@working»<done>), $kill) if @working and not $kill;
 				reap-finished();
+				@working».kill if $kill;
+				$formatter.summarize($aggregator, ?$kill);
+				$aggregator;
 			}
-			await Promise.anyof(Promise.allof(@working»<done>), $kill) if @working and not $kill;
-			reap-finished();
-			@working».kill if $kill;
-			$formatter.summarize($aggregator, ?$kill);
-			$aggregator;
-		}
-		sub reap-finished() {
-			my @new-working;
-			for @working -> $current {
-				if $current<done> {
-					$aggregator.add-result($current<parser>.result);
-					$current<session>.close-test($current<parser>.result);
+			sub reap-finished() {
+				my @new-working;
+				for @working -> $current {
+					if $current<done> {
+						$aggregator.add-result($current<parser>.result);
+						$current<session>.close-test($current<parser>.result);
+					}
+					else {
+						@new-working.push($current);
+					}
 				}
-				else {
-					@new-working.push($current);
-				}
+				@working = @new-working;
 			}
-			@working = @new-working;
+			return Run.new(:$done, :$kill);
 		}
-		return Run.new(:$done, :$kill);
+		else {
+			my $done = start {
+				for @!sources -> $name {
+					last if $kill;
+					my $session = $formatter.open-test($name);
+					my $source = @!handlers.max(*.can-handle($name)).make-source($name);
+					my $parser = TAP::Runner::Sync.new(:$source, :handlers[$session]);
+					my $result = $parser.run(:$kill);
+					$aggregator.add-result($result);
+					$session.close-test($result);
+				}
+				@working».kill if $kill;
+				$formatter.summarize($aggregator, ?$kill);
+				$aggregator;
+			}
+			return Run.new(:$done, :$kill);
+		}
 	}
 }
