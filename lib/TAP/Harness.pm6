@@ -45,7 +45,7 @@ package TAP::Runner {
 			}
 		}
 		multi method handle-entry(TAP::Plan $plan) {
-			if $!seen-plan {
+			if $!seen-plan != Unseen {
 				self!add-error('Seen a second plan');
 			}
 			else {
@@ -92,7 +92,7 @@ package TAP::Runner {
 		}
 
 		method end-entries() {
-			if !$!seen-plan {
+			if $!seen-plan == Unseen {
 				self!add-error('No plan found in TAP output');
 			}
 			elsif $!tests-run != $!tests-planned {

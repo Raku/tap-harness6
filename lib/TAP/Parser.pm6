@@ -18,7 +18,7 @@ package TAP {
 			^^ [ <plan> | <test> | <bailout> | <version> | <comment> | <yaml> | <sub-test> || <unknown> ] \n
 		}
 		token plan {
-			'1..' <count=.num> [ '#' <.sp>* $<directive>=[:i 'SKIP'] <.alnum>* [ <.sp>+ $<explanation>=[\N*] ]? ]?
+			'1..' <count=.num> <.sp>* [ '#' <.sp>* $<directive>=[:i 'SKIP'] <.alnum>* [ <.sp>+ $<explanation>=[\N*] ]? ]?
 		}
 		regex description {
 			[ <-[\n\#\\]> | \\<[\\#]> ]+ <!after <sp>+>
