@@ -2,213 +2,259 @@ use TAP::Entry;
 use TAP::Result;
 
 package TAP {
+	enum Formatter::Volume <Silent ReallyQuiet Quiet Normal Verbose>;
 	role Formatter {
-		method summarize(TAP::Aggregator) { ... }
+		has Bool $.timer = False;
+		has Formatter::Volume $.volume = Normal;
+	}
+	role Reporter {
+		method summarize(TAP::Aggregator, Bool $interrupted) { ... }
 		method open-test(Str $) { ... }
 	}
-	enum Formatter::Volume <Silent ReallyQuiet Quiet Normal Verbose>;
 
-	role Formatter::Text does Formatter {
-		has Bool $.parallel;
-		has Formatter::Volume $.volume;
-		has Bool $.timer;
-
+	class TAP::Reporter::Text { ... }
+	role Reporter::Text::Session does TAP::Session {
+		has TAP::Reporter $.reporter;
+		has Str $.name;
+		has Str $.header;
+		method clear-for-close() {
+		}
+		method close-test(TAP::Result $result) {
+			$!reporter.print-result(self, $result);
+		}
+		method handle-entry(TAP::Entry $) {
+		}
+	}
+	class Formatter::Text does Formatter {
 		has Int $!longest;
-		method BUILD(:$!parallel, :$!volume = Normal, :$!timer = False, :@names) {
+
+		submethod BUILD(:@names) {
 			$!longest = @names ?? @names».chars.max !! 12;
 		}
 		method format-name($name) {
 			my $periods = '.' x ( $!longest + 2 - $name.chars);
-			my @now = $!timer ?? ~DateTime.new(now, :formatter{ '[' ~ .hour ~ ':' ~ .minute ~ ':' ~ .second.Int ~ ']' }) !! ();
+			my @now = $.timer ?? ~DateTime.new(now, :formatter{ '[' ~ .hour ~ ':' ~ .minute ~ ':' ~ .second.Int ~ ']' }) !! ();
 			return (@now, $name, $periods).join(' ');
 		}
-		method summarize(TAP::Aggregator $aggregator, Bool $interrupted) {
+		method format-summary(TAP::Aggregator $aggregator, Bool $interrupted) {
 			my @tests = $aggregator.descriptions;
 			my $total = $aggregator.tests-run;
 			my $passed = $aggregator.passed;
+			my $output = '';
 
 			if $interrupted {
-				self.failure-output("Test run interrupted!\n")
+				$output ~= self.format-failure("Test run interrupted!\n")
 			}
 
 			if $aggregator.failed == 0 {
-				self.success-output("All tests successful.\n");
+				$output ~= self.format-success("All tests successful.\n");
 			}
 
 			if $total != $passed || $aggregator.has-problems {
-				self.output("\nTest Summary Report");
-				self.output("\n-------------------\n");
+				$output ~= "\nTest Summary Report";
+				$output ~= "\n-------------------\n";
 				for @tests -> $name {
 					my $result = $aggregator.results-for{$name};
 					if $result.has-problems {
 						my $spaces = ' ' x min($!longest - $name.chars, 1);
-						my $method = $result.has-errors ?? 'failure-output' !! 'output';
 						my $wait = $result.exit-status ?? 0 // '(none)' !! '(none)';
-						self."$method"("$name$spaces (Wstat: $wait Tests: {$result.tests-run} Failed: {$result.failed.elems})\n");
+						my $line = "$name$spaces (Wstat: $wait Tests: {$result.tests-run} Failed: {$result.failed.elems})\n";
+						$output ~= $result.has-errors ?? self.format-failure($line) !! $line;
 
 						if $result.failed -> @failed {
-							self.failure-output('  Failed tests:  ' ~ @failed.join(' ') ~ "\n");
+							$output ~= self.format-failure('  Failed tests:  ' ~ @failed.join(' ') ~ "\n");
 						}
 						if $result.todo-passed -> @todo-passed {
-							self.output('  TODO passed:  ' ~ @todo-passed.join(' ') ~ "\n");
+							$output ~= "  TODO passed:  { @todo-passed.join(' ') }\n";
 						}
 						if $result.exit-status.defined { # XXX
 							if $result.exit {
-								self.failure-output("Non-zero exit status: { $result.exit }\n");
+								$output ~= self.format-failure("Non-zero exit status: { $result.exit }\n");
 							}
 							elsif $result.wait {
-								self.failure-output("Non-zero wait status: { $result.wait }\n");
+								$output ~= self.format-failure("Non-zero wait status: { $result.wait }\n");
 							}
 						}
 						if $result.errors -> @errors {
 							my ($head, @tail) = @errors;
-							self.failure-output("  Parse errors: $head\n");
+							$output ~= self.format-failure("  Parse errors: $head\n");
 							for @tail -> $error {
-								self.failure-output(' ' x 16 ~ $error ~ "\n");
+								$output ~= self.format-failure(' ' x 16 ~ $error ~ "\n");
 							}
 						}
 					}
 				}
 			}
-			self.output("Files={ @tests.elems }, Tests=$total\n");
+			$output ~= "Files={ @tests.elems }, Tests=$total\n";
 			my $status = $aggregator.get-status;
-			self.output("Result: $status\n");
+			$output ~= "Result: $status\n";
+			return $output;
 		}
-		method output(Any $value) {
-			$.handle.print($value);
+		method format-success(Str $output) {
+			return $output;
 		}
-		method success-output(Str $output) {
-			self.output($output);
+		method format-failure(Str $output) {
+			return $output;
 		}
-		method failure-output(Str $output) {
-			self.output($output);
+		method format-return(Str $output) {
+			return $output;
 		}
-	}
-	role Formatter::Text::Session does TAP::Session {
-		has TAP::Formatter::Text $.formatter;
-		has Str $.name;
-		has Str $!pretty = $!formatter.format-name($!name);
-		method header {
-			return $!name;
+		method format-result(Reporter::Text::Session $session, TAP::Result $result) {
+			my $output;
+			my $name = $session.header;
+			if ($result.skip-all) {
+				$output = self.format-return("$name skipped");
+			}
+			elsif ($result.has-errors) {
+				$output = self.format-test-failure($name, $result);
+			}
+			else {
+				my $time = self.timer && $result.time ?? sprintf ' %8d ms', Int($result.time * 1000) !! '';
+				$output = self.format-return("$name ok$time\n");
+			}
+			return $output;
 		}
-		method clear-for-close() {
-		}
-		method output-return(Str $output) {
-			self.output($output);
-		}
-		method output-test-failure(TAP::Result $result) {
-			return if $!formatter.volume < Quiet;
-			self.output-return("$!pretty ");
+		method format-test-failure(Str $name, TAP::Result $result) {
+			return if self.volume < Quiet;
+			my $output = self.format-return("$name ");
 
 			my $total = $result.tests-planned // $result.tests-run;
 			my $failed = $result.failed + abs($total - $result.tests-run);
 
 			if $result.exit -> $status {
-				$!formatter.failure-output("Dubious, test returned $status\n");
+				$output ~= self.format-failure("Dubious, test returned $status\n");
 			}
 
 			if $result.failed == 0 {
-				$!formatter.failure-output($total ?? "All $total subtests passed " !! 'No subtests run');
+				$output ~= self.format-failure($total ?? "All $total subtests passed " !! 'No subtests run');
 			}
 			else {
-				$!formatter.failure-output("Failed {$result.failed}/$total subtests ");
+				$output ~= self.format-failure("Failed {$result.failed}/$total subtests ");
 				if (!$total) {
-					$!formatter.failure-output("\nNo tests run!");
+					$output ~= self.format-failure("\nNo tests run!");
 				}
 			}
 
 			if $result.skipped.elems -> $skipped {
 				my $passed = $result.passed.elems - $skipped;
 				my $test = 'subtest' ~ ( $skipped != 1 ?? 's' !! '' );
-				$!formatter.output("\n\t(less $skipped skipped $test: $passed okay)");
+				$output ~= "\n\t(less $skipped skipped $test: $passed okay)";
 			}
 
 			if $result.todo-passed.elems -> $todo-passed {
 				my $test = $todo-passed > 1 ?? 'tests' !! 'test';
-				$!formatter.output("\n\t($todo-passed TODO $test unexpectedly succeeded)");
+				$output ~= "\n\t($todo-passed TODO $test unexpectedly succeeded)";
 			}
 
-			$!formatter.output("\n");
+			$output ~= "\n";
+			return $output;
 		}
-		method close-test(TAP::Result $result) {
-			self.clear-for-close($result);
-			if ($result.skip-all) {
-				self.output-return("$!pretty skipped");
-			}
-			elsif ($result.has-errors) {
-				self.output-test-failure($result);
-			}
-			else {
-				my $time = $!formatter.timer && $result.time ?? sprintf ' %8d ms', Int($result.time * 1000) !! '';
-				self.output-return("$!pretty ok$time\n");
-			}
+	}
+	class Reporter::Text does Reporter {
+		has IO::Handle $!handle;
+		has Formatter::Text $!formatter;
+
+		submethod BUILD(:@names, :$!handle = $*OUT, :$volume = Normal, :$timer = False) {
+			$!formatter = Formatter::Text.new(:@names, :$volume, :$timer);
+		}
+
+		method open-test(Str $name) {
+			my $header = $!formatter.format-name($name);
+			return Formatter::Text::Session.new(:$name, :$header, :formatter(self));
+		}
+		method summarize(TAP::Aggregator $aggregator, Bool $interrupted) {
+			self!output($!formatter.format-summary($aggregator, $interrupted));
+		}
+		method !output(Any $value) {
+			$!handle.print($value);
+		}
+		method print-result(Reporter::Text::Session $session, TAP::Result $report) {
+			self!output($!formatter.format-result($session, $report));
 		}
 	}
 
-	class Formatter::Console does Formatter::Text {
+	class Formatter::Console is Formatter::Text {
 		my &colored = do {
 			try { require Term::ANSIColor }
 			GLOBAL::Term::ANSIColor::EXPORT::DEFAULT::<&colored> // sub (Str $text, Str $) { $text };
 		}
-		method success-output(Str $output) {
-			self.output(colored($output, 'green'));
+		method format-success(Str $output) {
+			return colored($output, 'green');
 		}
-		method failure-output(Str $output) {
-			self.output(colored($output, 'red'));
+		method format-failure(Str $output) {
+			return colored($output, 'red');
 		}
-		class Session does Formatter::Text::Session {
-			has TAP::Plan $!plan;
-			has Int $!last-updated = 0;
-			has Str $!planstr = '/?';
-			has Int $!number = 0;
-			proto method handle-entry(TAP::Entry $entry) {
-				#$.formatter.output($entry.perl ~ "\n");
-				{*};
-			}
-			multi method handle-entry(TAP::Bailout $bailout) {
-				my $explanation = $bailout.explanation // '';
-				self.failure-output("Bailout called.  Further testing stopped: $explanation\n");
-			}
-			multi method handle-entry(TAP::Plan $!plan) {
-				$!planstr = '/' ~ $!plan.tests;
-			}
-			multi method handle-entry(TAP::Test $test) {
-				my $now = time;
-				++$!number;
-				if $!last-updated != $now {
-					$!last-updated = $now;
-					self.output-return(($!pretty, $test.number // $!number, $!planstr).join(''));
-				}
-			}
-			multi method handle-entry(TAP::Entry $) {
-			}
-			method output(Str $output) {
-				$!formatter.output($output);
-			}
-			method output-return(Str $output) {
-				self.output("\r$output");
-			}
-			method clear-for-close(TAP::Result $result) {
-				my $length = ($!pretty ~ $!planstr ~ $result.tests-run).chars + 1;
-				self.output-return(' ' x $length);
+		method format-return(Str $output) {
+			return "\r$output";
+		}
+	}
+
+	class Reporter::Console::Session does Reporter::Text::Session {
+		has Int $!last-updated = 0;
+		has Int $!plan = Int;
+		has Int $!number = 0;
+		proto method handle-entry(TAP::Entry $entry) {
+			#$.formatter.output($entry.perl ~ "\n");
+			{*};
+		}
+		multi method handle-entry(TAP::Bailout $bailout) {
+			my $explanation = $bailout.explanation // '';
+			$!reporter.bailout($explanation);
+		}
+		multi method handle-entry(TAP::Plan $plan) {
+			$!plan = $plan.tests;
+		}
+		multi method handle-entry(TAP::Test $test) {
+			my $now = time;
+			++$!number;
+			if $!last-updated != $now {
+				$!last-updated = $now;
+				$!reporter.update($.name, $!header, $test.number // $!number, $!plan);
 			}
 		}
-		class Session::Parallel is Session {
-			method handle-entry(TAP::Entry $entry) {
-				nextsame;
-			}
-			method close-test(TAP::Result $result) {
-				nextsame;
-			}
-			method clear-for-close(TAP::Result $result) {
-				nextsame;
-			}
+		multi method handle-entry(TAP::Entry $) {
+		}
+	}
+	class Reporter::Console does Reporter {
+		has Bool $.parallel;
+		has IO::Handle $.handle;
+		has Formatter::Console $!formatter;
+		has Int $!lastlength;
+
+		submethod BUILD(:@names, :$!handle = $*OUT, :$volume = Normal, :$timer = False) {
+			$!formatter = Formatter::Console.new(:@names, :$volume, :$timer);
+			$!lastlength = 0;
 		}
 
-		has IO::Handle $.handle = $*OUT;
+		method update(Str $name, Str $header, Int $number, Int $plan) {
+			my $status = ($header, $number, '/', $plan // '?').join('');
+			self.output($!formatter.format-return($status));
+			$!lastlength = $status.chars + 1;
+		}
+		method bailout(Str $explanation) {
+			self.output($!formatter.format-failure("Bailout called.  Further testing stopped: $explanation\n"));
+		}
+		method print-result(Reporter::Console::Session $session, TAP::Result $result) {
+			self.output($!formatter.format-return(' ' x $!lastlength));
+			self.output($!formatter.format-result($session, $result));
+		}
+		method summarize(TAP::Aggregator $aggregator, Bool $interrupted) {
+			self.output($!formatter.format-summary($aggregator, $interrupted));
+		}
+		method output(Any $value) {
+			$.handle.print($value);
+		}
+
 		method open-test(Str $name) {
-			my $session-class = $.parallel ?? Session::Parallel !! Session;
-			return $session-class.new(:$name, :formatter(self));
+			my $header = $!formatter.format-name($name);
+			return Reporter::Console::Session.new(:$name, :$header, :reporter(self));
+		}
+	}
+	class Formatter::Console::Parallel is Formatter::Console {
+		method update(Str $name, Str $header, Int $number, Str $planstr) {
+		}
+		method clear(TAP::Result $result) {
+			...;
 		}
 	}
 }
