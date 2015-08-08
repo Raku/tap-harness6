@@ -1,7 +1,7 @@
 use TAP::Parser;
 use TAP::Entry;
 use TAP::Result;
-use TAP::Formatter;
+use TAP::Reporter;
 
 package TAP::Runner {
 	class State does TAP::Entry::Handler {
