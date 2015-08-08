@@ -217,32 +217,44 @@ package TAP {
 	}
 	class Reporter::Console does Reporter {
 		has Bool $.parallel;
-		has IO::Handle $.handle;
 		has Formatter::Console $!formatter;
 		has Int $!lastlength;
+		has Supply $events;
 
-		submethod BUILD(:@names, :$!handle = $*OUT, :$volume = Normal, :$timer = False) {
+		submethod BUILD(:@names, IO::Handle :$handle = $*OUT, :$volume = Normal, :$timer = False) {
 			$!formatter = Formatter::Console.new(:@names, :$volume, :$timer);
 			$!lastlength = 0;
+			$!events = Supply.new;
+
+			multi receive('update', Str $name, Str $header, Int $number, Int $plan) {
+				my $status = ($header, $number, '/', $plan // '?').join('');
+				$handle.print($!formatter.format-return($status));
+				$!lastlength = $status.chars + 1;
+			}
+			multi receive('bailout', Str $explanation) {
+				$handle.print($!formatter.format-failure("Bailout called.  Further testing stopped: $explanation\n"));
+			}
+			multi receive('result', Reporter::Console::Session $session, TAP::Result $result) {
+				$handle.print($!formatter.format-return(' ' x $!lastlength) ~ $!formatter.format-result($session, $result));
+			}
+			multi receive('summary', TAP::Aggregator $aggregator, Bool $interrupted) {
+				$handle.print($!formatter.format-summary($aggregator, $interrupted));
+			}
+
+			$!events.act(-> @args { receive(|@args) });
 		}
 
 		method update(Str $name, Str $header, Int $number, Int $plan) {
-			my $status = ($header, $number, '/', $plan // '?').join('');
-			self.output($!formatter.format-return($status));
-			$!lastlength = $status.chars + 1;
+			$!events.emit(['update', $name, $header, $number, $plan]);
 		}
 		method bailout(Str $explanation) {
-			self.output($!formatter.format-failure("Bailout called.  Further testing stopped: $explanation\n"));
+			$!events.emit(['bailout', $explanation]);
 		}
 		method print-result(Reporter::Console::Session $session, TAP::Result $result) {
-			self.output($!formatter.format-return(' ' x $!lastlength));
-			self.output($!formatter.format-result($session, $result));
+			$!events.emit(['result', $session, $result]);
 		}
 		method summarize(TAP::Aggregator $aggregator, Bool $interrupted) {
-			self.output($!formatter.format-summary($aggregator, $interrupted));
-		}
-		method output(Any $value) {
-			$.handle.print($value);
+			$!events.emit(['summary', $aggregator, $interrupted]);
 		}
 
 		method open-test(Str $name) {
