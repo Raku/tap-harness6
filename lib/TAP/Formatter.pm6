@@ -191,10 +191,9 @@ package TAP {
 
 	class Reporter::Console::Session does Reporter::Text::Session {
 		has Int $!last-updated = 0;
-		has Int $!plan = Int;
-		has Int $!number = 0;
+		has Int $.plan = Int;
+		has Int $.number = 0;
 		proto method handle-entry(TAP::Entry $entry) {
-			#$.formatter.output($entry.perl ~ "\n");
 			{*};
 		}
 		multi method handle-entry(TAP::Bailout $bailout) {
@@ -220,22 +219,46 @@ package TAP {
 		has Formatter::Console $!formatter;
 		has Int $!lastlength;
 		has Supply $events;
+		has Reporter::Console::Session @!active;
+		has Int $!tests;
+		has Int $!fails;
 
 		submethod BUILD(:@names, IO::Handle :$handle = $*OUT, :$volume = Normal, :$timer = False) {
 			$!formatter = Formatter::Console.new(:@names, :$volume, :$timer);
 			$!lastlength = 0;
 			$!events = Supply.new;
+			@!active .= new;
 
+			my $now = 0;
+			my $start = now;
+
+			sub output-ruler(Bool $refresh) {
+				my $new-now = now;
+				return if $now == $new-now and !$refresh;
+				$now = $new-now;
+				return if $!formatter.volume < Quiet;
+				my $header = sprintf '===( %7d;%d', $!tests, $now - $start;
+				my @items = @!active.map(-> $active { sprintf '%' ~ $active.plan.chars ~ "d/%d", $active.number, $active.plan });
+				my $ruler = ($header, @items).join('  ') ~ ')===';
+				$handle.print($!formatter.format-return($ruler));
+			}
 			multi receive('update', Str $name, Str $header, Int $number, Int $plan) {
-				my $status = ($header, $number, '/', $plan // '?').join('');
-				$handle.print($!formatter.format-return($status));
-				$!lastlength = $status.chars + 1;
+				if @!active.elems == 1 {
+					my $status = ($header, $number, '/', $plan // '?').join('');
+					$handle.print($!formatter.format-return($status));
+					$!lastlength = $status.chars + 1;
+				}
+				else {
+					output-ruler($number == 1);
+				}
 			}
 			multi receive('bailout', Str $explanation) {
 				$handle.print($!formatter.format-failure("Bailout called.  Further testing stopped: $explanation\n"));
 			}
 			multi receive('result', Reporter::Console::Session $session, TAP::Result $result) {
 				$handle.print($!formatter.format-return(' ' x $!lastlength) ~ $!formatter.format-result($session, $result));
+				@!active = @!active.grep(* !=== $session);
+				output-ruler(True) if @!active.elems > 1;
 			}
 			multi receive('summary', TAP::Aggregator $aggregator, Bool $interrupted) {
 				$handle.print($!formatter.format-summary($aggregator, $interrupted));
@@ -259,7 +282,9 @@ package TAP {
 
 		method open-test(Str $name) {
 			my $header = $!formatter.format-name($name);
-			return Reporter::Console::Session.new(:$name, :$header, :reporter(self));
+			my $ret = Reporter::Console::Session.new(:$name, :$header, :reporter(self));
+			@!active.push($ret);
+			return $ret;
 		}
 	}
 	class Formatter::Console::Parallel is Formatter::Console {

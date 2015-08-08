@@ -20,7 +20,6 @@ bin/prove6 is the easiest way to use it. It's fairly basic but similar enough to
 
 These features are currently not implemented but are considered desirable:
 
- * Parallel console outputting
  * Rule based parallel scheduling
  * SourceHandlers other than ::Perl6
  * Various prove arguments
