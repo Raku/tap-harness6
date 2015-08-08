@@ -23,7 +23,6 @@ These features are currently not implemented but are considered desirable:
  * Rule based parallel scheduling
  * SourceHandlers other than ::Perl6
  * Various prove arguments
- * Serialize/deserialize YAMLish
 
 # TAP outputting
 
