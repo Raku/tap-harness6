@@ -206,7 +206,7 @@ package TAP::Runner {
 
 		method new(Source :$source, :@handlers, Promise :$bailout) {
 			my $state = State.new(:$bailout);
-			my TAP::Entry::Handler @all_handlers = $state, @handlers;
+			my TAP::Entry::Handler @all_handlers = flat $state, @handlers;
 			my $run = get_runner($source, @all_handlers);
 			return Async.bless(:name($source.name), :$state, :$run);
 		}
