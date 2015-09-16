@@ -1,5 +1,4 @@
-use TAP::Harness;
-use TAP::Entry;
+use TAP;
 
 use Test::More;
 

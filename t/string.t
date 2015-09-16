@@ -1,5 +1,4 @@
-use TAP::Parser;
-use TAP::Harness;
+use TAP;
 use Test::More;
 
 my $content1 = q:heredoc/END/;

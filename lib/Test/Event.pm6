@@ -1,4 +1,4 @@
-use TAP::Entry;
+use TAP;
 
 package Test {
 	role Event {

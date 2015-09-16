@@ -1,6 +1,6 @@
 #! perl6
 
-use TAP::Harness;
+use TAP;
 
 my $path-sep = $*DISTRO.path-sep;
 
