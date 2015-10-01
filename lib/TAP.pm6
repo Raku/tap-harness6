@@ -213,7 +213,7 @@ package TAP {
 			$!todo += $result.todo.elems;
 			$!todo-passed += $result.todo-passed.elems;
 			$!skipped += $result.skipped.elems;
-			@!errors.push(@($result.errors));
+			@!errors.push(|$result.errors);
 			$!exit-failed = True if $result.exit-status && $result.exit-status.exitcode > 0;
 		}
 
@@ -861,7 +861,7 @@ package TAP {
 
 		method new(Source :$source, :@handlers, Promise :$bailout) {
 			my $state = State.new(:$bailout);
-			my TAP::Entry::Handler @all_handlers = flat $state, @handlers;
+			my TAP::Entry::Handler @all_handlers = $state, |@handlers;
 			my $run = get_runner($source, @all_handlers);
 			return Async.bless(:name($source.name), :$state, :$run);
 		}
@@ -886,7 +886,7 @@ package TAP {
 
 		method run(Promise :$bailout) {
 			my $state = State.new(:$bailout);
-			my TAP::Entry::Handler @handlers = $state, @!handlers;
+			my TAP::Entry::Handler @handlers = $state, |@!handlers;
 			my $start-time = now;
 			given $!source {
 				when Source::Proc {
