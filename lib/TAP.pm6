@@ -256,7 +256,7 @@ package TAP {
 		token test {
 			$<nok>=['not '?] 'ok' [ <.sp> <num> ]? ' -'?
 				[ <.sp>* <description> ]?
-				[ <.sp>* '#' <.sp>* $<directive>=[:i [ 'SKIP' | 'TODO'] <.alnum>* ] <.sp>+ $<explanation>=[\N*] ]?
+				[ <.sp>* '#' <.sp>* $<directive>=[:i [ 'SKIP' | 'TODO'] ] <.alnum>* [ <.sp>+ $<explanation>=[\N*] ]? ]?
 				<.sp>*
 		}
 		token bailout {
