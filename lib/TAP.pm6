@@ -538,8 +538,8 @@ package TAP {
 
 	class Formatter::Console is Formatter::Text {
 		my &colored = do {
-			try { require Term::ANSIColor }
-			GLOBAL::Term::ANSIColor::EXPORT::DEFAULT::<&colored> // sub (Str $text, Str $) { $text };
+			my $package = try { require Terminal::ANSIColor }
+			GLOBAL::Terminal::ANSIColor::EXPORT::DEFAULT::<&colored> // sub (Str $text, Str $) { $text };
 		}
 		method format-success(Str $output) {
 			return colored($output, 'green');
