@@ -7,7 +7,7 @@ package TAP {
 		}
 	}
 	class Version does Entry {
-		has Int:D $.version;
+		has Int:D $.version is required;
 		method to-string() {
 			return "TAP Version $!version";
 		}
@@ -25,7 +25,7 @@ package TAP {
 	subset Directive::Explanation of Str where { not .defined or m/ ^ \N* $ / };
 
 	class Test does Entry {
-		has Bool:D $.ok;
+		has Bool:D $.ok is required;
 		has Int $.number;
 		has Str $.description;
 		has Directive:D $.directive = No-Directive;
@@ -75,13 +75,13 @@ package TAP {
 		}
 	}
 	class Comment does Entry {
-		has Str:D $.comment;
+		has Str:D $.comment is required;
 		method to-string {
 			return "# $!comment";
 		}
 	}
 	class YAML does Entry {
-		has Str:D $.serialized;
+		has Str:D $.serialized is required;
 		has Any $.deserialized;
 		method to-string {
 			return "  ---\n" ~ $!serialized.indent(2) ~~ '  ...'
@@ -775,7 +775,7 @@ package TAP {
 	my class Run {
 		subset Killable of Any where *.can('kill');
 		has Killable $!process;
-		has Promise:D $.done;
+		has Promise:D $.done is required;
 		has Promise $.timer;
 		method kill() {
 			$!process.kill if $!process;
@@ -937,7 +937,7 @@ class TAP::Harness {
 
 	has SourceHandler @.handlers = SourceHandler::Perl6.new();
 	has Any @.sources;
-	has TAP::Reporter:T $.reporter-class = TAP::Reporter::Console;
+	has TAP::Reporter:U $.reporter-class = TAP::Reporter::Console;
 
 	class Run {
 		has Promise $.done handles <result>;
