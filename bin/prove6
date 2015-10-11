@@ -5,7 +5,7 @@ use TAP;
 my $path-sep = $*DISTRO.path-sep;
 
 multi listall(IO::Path $path where .d) {
-	return $path.dir(:test(rx/\.t$/)).map(&listall);
+	return $path.dir(:test(rx/\.t$/)).flatmap(&listall);
 }
 multi listall(IO::Path $path) {
 	return ~$path;
@@ -19,7 +19,7 @@ sub MAIN(Bool :l($lib), Bool :b($blib), Bool :$timer, Int :j($jobs) = 1, *@files
 	@extra.unshift($*CWD ~ '/blib/lib') if $blib;
 	%*ENV<PERL6LIB> = @extra.join($path-sep) if @extra;
 
-	my @sources = @files.map(*.IO).map(&listall);
+	my @sources = @files.map(*.IO).flatmap(&listall);
 	my $harness = TAP::Harness.new(:@sources).run(:$jobs, :$timer);
 	my $int = signal(SIGINT).tap(-> { $harness.kill("Interrupted"); $int.close(); });
 	return min($harness.result.failed, 254);

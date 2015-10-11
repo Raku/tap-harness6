@@ -397,7 +397,7 @@ package TAP {
 		method format-name($name) {
 			my $periods = '.' x ( $!longest + 2 - $name.chars);
 			my @now = $.timer ?? ~DateTime.new(now, :formatter{ '[' ~ .hour ~ ':' ~ .minute ~ ':' ~ .second.Int ~ ']' }) !! ();
-			return (@now, $name, $periods).join(' ');
+			return (|@now, $name, $periods).join(' ');
 		}
 		method format-summary(TAP::Aggregator $aggregator, Bool $interrupted) {
 			my @tests = $aggregator.descriptions;
@@ -602,7 +602,7 @@ package TAP {
 				return if $!formatter.volume < Quiet;
 				my $header = sprintf '===( %7d;%d', $!tests, $now - $start;
 				my @items = @!active.map(-> $active { sprintf '%' ~ $active.plan.chars ~ "d/%d", $active.number, $active.plan });
-				my $ruler = ($header, @items).join('  ') ~ ')===';
+				my $ruler = ($header, |@items).join('  ') ~ ')===';
 				$handle.print($!formatter.format-return($ruler));
 			}
 			multi receive('update', Str $name, Str $header, Int $number, Int $plan) {
