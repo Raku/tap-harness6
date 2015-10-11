@@ -940,34 +940,36 @@ class TAP::Harness {
 	has TAP::Reporter:U $.reporter-class = TAP::Reporter::Console;
 
 	class Run {
-		has Promise $.done handles <result>;
-		has Promise $!kill;
+		has Promise $.waiter handles <result>;
+		has Promise $!killed;
+		submethod BUILD (Promise :$!waiter, Promise :$!killed) {
+		}
 		method kill(Any $reason = True) {
-			$!kill.keep($reason);
+			$!killed.keep($reason);
 		}
 	}
 
 	method run(Int :$jobs = 1, Bool :$timer = False) {
-		my @working;
-		my $kill = Promise.new;
+		my $killed = Promise.new;
 		my $aggregator = TAP::Aggregator.new();
 		my $reporter = $!reporter-class.new(:parallel($jobs > 1), :names(@.sources), :$timer, :$aggregator);
 		if $jobs > 1 {
-			my $done = start {
+			my @working;
+			my $waiter = start {
 				for @!sources -> $name {
-					last if $kill;
+					last if $killed;
 					my $session = $reporter.open-test($name);
 					my $source = @!handlers.max(*.can-handle($name)).make-source($name);
-					my $parser = TAP::Runner::Async.new(:$source, :handlers[$session], :$kill);
+					my $parser = TAP::Runner::Async.new(:$source, :handlers[$session], :$killed);
 					@working.push({ :$parser, :$session, :done($parser.done) });
 					next if @working < $jobs;
-					await Promise.anyof(@working»<done>, $kill);
+					await Promise.anyof(@working»<done>, $killed);
 					reap-finished();
 				}
-				await Promise.anyof(Promise.allof(@working»<done>), $kill) if @working and not $kill;
+				await Promise.anyof(Promise.allof(@working»<done>), $killed) if @working and not $killed;
 				reap-finished();
-				@working».kill if $kill;
-				$reporter.summarize($aggregator, ?$kill);
+				@working».kill if $killed;
+				$reporter.summarize($aggregator, ?$killed);
 				$aggregator;
 			}
 			sub reap-finished() {
@@ -983,24 +985,23 @@ class TAP::Harness {
 				}
 				@working = @new-working;
 			}
-			return Run.new(:$done, :$kill);
+			return Run.new(:$waiter, :$killed);
 		}
 		else {
-			my $done = start {
+			my $waiter = start {
 				for @!sources -> $name {
-					last if $kill;
+					last if $killed;
 					my $session = $reporter.open-test($name);
 					my $source = @!handlers.max(*.can-handle($name)).make-source($name);
 					my $parser = TAP::Runner::Sync.new(:$source, :handlers[$session]);
-					my $result = $parser.run(:$kill);
+					my $result = $parser.run(:$killed);
 					$aggregator.add-result($result);
 					$session.close-test($result);
 				}
-				@working».kill if $kill;
-				$reporter.summarize($aggregator, ?$kill);
+				$reporter.summarize($aggregator, ?$killed);
 				$aggregator;
 			}
-			return Run.new(:$done, :$kill);
+			return Run.new(:$waiter, :$killed);
 		}
 	}
 }
