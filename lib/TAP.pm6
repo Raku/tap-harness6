@@ -650,13 +650,6 @@ package TAP {
 			return $ret;
 		}
 	}
-	class Formatter::Console::Parallel is Formatter::Console {
-		method update(Str $name, Str $header, Int $number, Str $planstr) {
-		}
-		method clear(TAP::Result $result) {
-			...;
-		}
-	}
 
 	package Runner {
 		class State does TAP::Entry::Handler {
