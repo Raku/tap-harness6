@@ -159,20 +159,17 @@ package TAP {
 		has Proc $.exit-status;
 		has Duration $.time;
 		method exit() {
-			$!exit-status.defined ?? $!exit-status.exitcode !! Int;
+			return $!exit-status.defined ?? $!exit-status.exitcode !! Int;
 		}
 		method wait() {
-			$!exit-status.defined ?? $!exit-status.status !! Int;
+			return $!exit-status.defined ?? $!exit-status.status !! Int;
 		}
 
 		method has-problems() {
-			@!todo || self.has-errors;
-		}
-		method has-errors() {
 			return @!failed || @!errors || self.exit-failed;
 		}
 		method exit-failed() {
-			return $!exit-status && $!exit-status.exitcode > 0;
+			return $!exit-status.defined && $!exit-status.status;
 		}
 	}
 
@@ -422,12 +419,12 @@ package TAP {
 						my $spaces = ' ' x min($!longest - $name.chars, 1);
 						my $wait = $result.exit-status ?? 0 // '(none)' !! '(none)';
 						my $line = "$name$spaces (Wstat: $wait Tests: {$result.tests-run} Failed: {$result.failed.elems})\n";
-						$output ~= $result.has-errors ?? self.format-failure($line) !! $line;
+						$output ~= $result.has-problems	?? self.format-failure($line) !! $line;
 
-						if $result.failed -> @failed {
+						if $result.failed -> *@failed {
 							$output ~= self.format-failure('  Failed tests:  ' ~ @failed.join(' ') ~ "\n");
 						}
-						if $result.todo-passed -> @todo-passed {
+						if $result.todo-passed -> *@todo-passed {
 							$output ~= "  TODO passed:  { @todo-passed.join(' ') }\n";
 						}
 						if $result.exit-status.defined { # XXX
@@ -468,7 +465,7 @@ package TAP {
 			if ($result.skip-all) {
 				$output = self.format-return("$name skipped");
 			}
-			elsif ($result.has-errors) {
+			elsif ($result.has-problems) {
 				$output = self.format-test-failure($name, $result);
 			}
 			else {
