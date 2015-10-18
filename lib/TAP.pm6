@@ -778,8 +778,10 @@ package TAP {
 			}
 		}
 		class Source::Proc does Source {
-			has IO::Path $.path;
+			has IO::Path:D $.path is required;
 			has @.args;
+			has $.err = '-';
+			has Bool $.merge = False;
 		}
 		class Source::File does Source {
 			has Str $.filename;
@@ -881,7 +883,7 @@ package TAP {
 				given $!source {
 					when Source::Proc {
 						my $parser = TAP::Parser.new(:@handlers);
-						my $proc = run($!source.path, $!source.args, :out, :!chomp);
+						my $proc = run($!source.path, $!source.args, :out, :err($!source.err), :merge($!source.merge), :!chomp);
 						for $proc.out.lines -> $line {
 							$parser.add-data($line);
 						}
@@ -919,8 +921,8 @@ package TAP {
 			method can-handle($name) {
 				return 0.5;
 			}
-			method make-source($name) {
-				return TAP::Runner::Source::Proc.new(:$name, :path($*EXECUTABLE), :args[$name]);
+			method make-source($name, :$err, Bool :$merge) {
+				return TAP::Runner::Source::Proc.new(:$name, :path($*EXECUTABLE), :args[$name], :$err, :$merge);
 			}
 		}
 
@@ -938,7 +940,7 @@ package TAP {
 			}
 		}
 
-		method run(Int :$jobs = 1, Bool :$timer = False) {
+		method run(Int :$jobs = 1, Bool :$timer = False, :$err = '-', Bool :$merge = False) {
 			my $killed = Promise.new;
 			my $aggregator = TAP::Aggregator.new();
 			my $reporter = $!reporter-class.new(:parallel($jobs > 1), :names(@.sources), :$timer, :$aggregator);
@@ -948,7 +950,7 @@ package TAP {
 					for @!sources -> $name {
 						last if $killed;
 						my $session = $reporter.open-test($name);
-						my $source = @!handlers.max(*.can-handle($name)).make-source($name);
+						my $source = @!handlers.max(*.can-handle($name)).make-source($name, :$err, :$merge);
 						my $parser = TAP::Runner::Async.new(:$source, :handlers[$session], :$killed);
 						@working.push({ :$parser, :$session, :done($parser.done) });
 						next if @working < $jobs;
