@@ -489,7 +489,7 @@ package TAP {
 				$output ~= self.format-failure($total ?? "All $total subtests passed " !! 'No subtests run');
 			}
 			else {
-				$output ~= self.format-failure("Failed {$result.failed}/$total subtests ");
+				$output ~= self.format-failure("Failed {$result.failed.elems}/$total subtests ");
 				if (!$total) {
 					$output ~= self.format-failure("\nNo tests run!");
 				}
