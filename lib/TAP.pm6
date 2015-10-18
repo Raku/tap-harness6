@@ -763,15 +763,17 @@ package TAP {
 			}
 		}
 		my class Run {
-			subset Killable of Any where *.can('kill');
-			has Killable $!process;
-			has Promise:D $.done is required;
-			has Promise $.timer;
+			subset Killable of Any where { not .defined or .can('kill') };
+			has Promise:D $.process is required;
+			has Killable $!killer;
+			has Promise $!timer;
+			submethod BUILD(Promise :$!process, Killable :$!killer, Promise :$!timer) {
+			}
 			method kill() {
-				$!process.kill if $!process;
+				$!killer.kill if $!process;
 			}
 			method exit-status() {
-				return $!done.result ~~ Proc ?? $.done.result !! Proc;
+				return $!process.result ~~ Proc ?? $.process.result !! Proc;
 			}
 			method time() {
 				return $!timer.defined ?? $!timer.result !! Duration;
@@ -816,28 +818,28 @@ package TAP {
 			has Str $.name;
 			has Run $!run;
 			has State $!state;
-			has Promise $.done;
+			has Promise $.waiter;
 
 			submethod BUILD(Str :$!name, State :$!state, Run :$!run) {
-				$!done = Promise.allof($!state.done, $!run.done);
+				$!waiter = Promise.allof($!state.done, $!run.process);
 			}
 
 			multi get_runner(Source::Proc $proc; TAP::Entry::Handler @handlers) {
-				my $process = Proc::Async.new($proc.path, $proc.args);
+				my $async = Proc::Async.new($proc.path, $proc.args);
 				my $lexer = TAP::Parser.new(:@handlers);
-				$process.stdout().act({ $lexer.add-data($^data) }, :done({ $lexer.close-data() }));
-				my $done = $process.start();
+				$async.stdout().act({ $lexer.add-data($^data) }, :done({ $lexer.close-data() }));
+				my $process = $async.start();
 				my $start-time = now;
-				my $timer = $done.then({ now - $start-time });
-				return Run.new(:$done, :$process, :$timer);
+				my $timer = $process.then({ now - $start-time });
+				return Run.new(:$process, :killer($async), :$timer);
 			}
 			multi get_runner(Source::Through $through; TAP::Entry::Handler @handlers) {
 				$through.staple(@handlers);
-				return Run.new(:done($through.promise));
+				return Run.new(:process($through.promise));
 			}
 			multi get_runner(Source::File $file; TAP::Entry::Handler @handlers) {
 				my $lexer = TAP::Parser.new(:@handlers);
-				return Run.new(:done(start {
+				return Run.new(:process(start {
 					$lexer.add-data($file.filename.IO.slurp);
 					$lexer.close-data();
 				}));
@@ -848,7 +850,7 @@ package TAP {
 				$lexer.close-data();
 				my $done = Promise.new;
 				$done.keep;
-				return Run.new(:$done);
+				return Run.new(:process($done));
 			}
 
 			method new(Source :$source, :@handlers, Promise :$bailout) {
@@ -860,12 +862,12 @@ package TAP {
 
 			method kill() {
 				$!run.kill();
-				$!done.break("killed") if not $!done;
+				$!waiter.break("killed") if not $!waiter;
 			}
 
 			has TAP::Result $!result;
 			method result {
-				await $!done;
+				await $!waiter;
 				return $!result //= $!state.finalize($!name, $!run.exit-status, $!run.time);
 			}
 
@@ -952,7 +954,7 @@ package TAP {
 						my $session = $reporter.open-test($name);
 						my $source = @!handlers.max(*.can-handle($name)).make-source($name, :$err, :$merge);
 						my $parser = TAP::Runner::Async.new(:$source, :handlers[$session], :$killed);
-						@working.push({ :$parser, :$session, :done($parser.done) });
+						@working.push({ :$parser, :$session, :done($parser.waiter) });
 						next if @working < $jobs;
 						await Promise.anyof(@working»<done>, $killed);
 						reap-finished();
