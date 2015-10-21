@@ -929,8 +929,11 @@ package TAP {
 		}
 
 		has SourceHandler @.handlers = SourceHandler::Perl6.new();
-		has Any @.sources;
 		has TAP::Reporter:U $.reporter-class = TAP::Reporter::Console;
+		has Int $.jobs = 1;
+		has Bool $.timer = False;
+		has Any $.err = '-';
+		has Bool $.merge = False;
 
 		class Run {
 			has Promise $.waiter handles <result>;
@@ -942,20 +945,20 @@ package TAP {
 			}
 		}
 
-		method run(Int :$jobs = 1, Bool :$timer = False, :$err = '-', Bool :$merge = False) {
+		method run(*@sources) {
 			my $killed = Promise.new;
 			my $aggregator = TAP::Aggregator.new();
-			my $reporter = $!reporter-class.new(:parallel($jobs > 1), :names(@.sources), :$timer, :$aggregator);
-			if $jobs > 1 {
+			my $reporter = $!reporter-class.new(:parallel($!jobs > 1), :names(@sources), :$!timer);
+			if $!jobs > 1 {
 				my @working;
 				my $waiter = start {
-					for @!sources -> $name {
+					for @sources -> $name {
 						last if $killed;
 						my $session = $reporter.open-test($name);
-						my $source = @!handlers.max(*.can-handle($name)).make-source($name, :$err, :$merge);
+						my $source = @!handlers.max(*.can-handle($name)).make-source($name, :$!err, :$!merge);
 						my $parser = TAP::Runner::Async.new(:$source, :handlers[$session], :$killed);
 						@working.push({ :$parser, :$session, :done($parser.waiter) });
-						next if @working < $jobs;
+						next if @working < $!jobs;
 						await Promise.anyof(@working»<done>, $killed);
 						reap-finished();
 					}
@@ -982,10 +985,10 @@ package TAP {
 			}
 			else {
 				my $waiter = start {
-					for @!sources -> $name {
+					for @sources -> $name {
 						last if $killed;
 						my $session = $reporter.open-test($name);
-						my $source = @!handlers.max(*.can-handle($name)).make-source($name);
+						my $source = @!handlers.max(*.can-handle($name)).make-source($name, :$!err, :$!merge);
 						my $parser = TAP::Runner::Sync.new(:$source, :handlers[$session]);
 						my $result = $parser.run(:$killed);
 						$aggregator.add-result($result);

@@ -20,7 +20,7 @@ sub MAIN(Bool :l($lib), Bool :b($blib), Bool :$timer, Int :j($jobs) = 1, *@files
 	%*ENV<PERL6LIB> = @extra.join($path-sep) if @extra;
 
 	my @sources = @files.map(*.IO).flatmap(&listall);
-	my $harness = TAP::Harness.new(:@sources).run(:$jobs, :$timer);
+	my $harness = TAP::Harness.new(:$jobs, :$timer).run(@sources);
 	my $int = signal(SIGINT).tap(-> { $harness.kill("Interrupted"); $int.close(); });
 	return min($harness.result.failed, 254);
 }
