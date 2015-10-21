@@ -11,7 +11,7 @@ multi listall(IO::Path $path) {
 	return ~$path;
 }
 
-sub MAIN(Bool :l($lib), Bool :b($blib), Bool :$timer, Int :j($jobs) = 1, *@files) {
+sub MAIN(Bool :l($lib), Bool :b($blib), Bool :$timer, Int :j($jobs) = 1, Bool :$ignore-exit = False, *@files) {
 	die "No files given to run" if not @files;
 
 	my @extra = (%*ENV<PERL6LIB> // '').split($path-sep);
@@ -20,7 +20,7 @@ sub MAIN(Bool :l($lib), Bool :b($blib), Bool :$timer, Int :j($jobs) = 1, *@files
 	%*ENV<PERL6LIB> = @extra.join($path-sep) if @extra;
 
 	my @sources = @files.map(*.IO).flatmap(&listall);
-	my $harness = TAP::Harness.new(:$jobs, :$timer).run(@sources);
+	my $harness = TAP::Harness.new(:$jobs, :$timer, :$ignore-exit).run(@sources);
 	my $int = signal(SIGINT).tap(-> { $harness.kill("Interrupted"); $int.close(); });
 	return min($harness.result.failed, 254);
 }

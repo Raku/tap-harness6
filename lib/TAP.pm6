@@ -189,6 +189,7 @@ package TAP {
 		has Int $.todo-passed;
 		has Int $.skipped;
 		has Bool $.exit-failed = False;
+		has Bool $.ignore-exit = False;
 
 		method add-result(Result $result) {
 			my $description = $result.name;
@@ -421,13 +422,13 @@ package TAP {
 						my $line = "$name$spaces (Wstat: $wait Tests: {$result.tests-run} Failed: {$result.failed.elems})\n";
 						$output ~= $result.has-problems	?? self.format-failure($line) !! $line;
 
-						if $result.failed -> *@failed {
+						if $result.failed -> @failed {
 							$output ~= self.format-failure('  Failed tests:  ' ~ @failed.join(' ') ~ "\n");
 						}
-						if $result.todo-passed -> *@todo-passed {
+						if $result.todo-passed -> @todo-passed {
 							$output ~= "  TODO passed:  { @todo-passed.join(' ') }\n";
 						}
-						if $result.exit-status.defined { # XXX
+						if $result.exit-status && !$aggregator.ignore-exit {
 							if $result.exit {
 								$output ~= self.format-failure("Non-zero exit status: { $result.exit }\n");
 							}
@@ -947,6 +948,7 @@ package TAP {
 		has Bool $.timer = False;
 		has Any $.err = '-';
 		has Bool $.merge = False;
+		has Bool $.ignore-exit = False;
 
 		class Run {
 			has Promise $.waiter handles <result>;
@@ -960,7 +962,7 @@ package TAP {
 
 		method run(*@sources) {
 			my $killed = Promise.new;
-			my $aggregator = TAP::Aggregator.new();
+			my $aggregator = TAP::Aggregator.new(:$!ignore-exit);
 			my $reporter = $!reporter-class.new(:parallel($!jobs > 1), :names(@sources), :$!timer);
 			if $!jobs > 1 {
 				my @working;
