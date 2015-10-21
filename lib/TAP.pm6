@@ -780,7 +780,7 @@ package TAP {
 			}
 		}
 		class Source::Proc does Source {
-			has IO::Path:D $.path is required;
+			has Str $.path is required;
 			has @.args;
 			has $.err = '-';
 			has Bool $.merge = False;
@@ -920,11 +920,24 @@ package TAP {
 			method make-source {...};
 		}
 		class SourceHandler::Perl6 does SourceHandler {
+			has @.incdirs;
 			method can-handle($name) {
 				return 0.5;
 			}
 			method make-source($name, :$err, Bool :$merge) {
-				return TAP::Runner::Source::Proc.new(:$name, :path($*EXECUTABLE), :args[$name], :$err, :$merge);
+				my @args = |@!incdirs.map("-I" ~ *), $name;
+				return TAP::Runner::Source::Proc.new(:$name, :path(~$*EXECUTABLE), :@args, :$err, :$merge);
+			}
+		}
+		class SourceHandler::Exec does SourceHandler {
+			has $.path;
+			has @.args;
+			method can-handle($name) {
+				return 0.4;
+			}
+			method make-source($name, :$err, Bool :$merge) {
+				my @args = |@!args, $name;
+				return TAP::Runner::Source::Proc.new(:$name, :$!path, :@args, :$err, :$merge);
 			}
 		}
 
