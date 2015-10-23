@@ -534,10 +534,7 @@ package TAP {
 	}
 
 	class Formatter::Console is Formatter::Text {
-		my &colored = do {
-			my $package = try { require Terminal::ANSIColor }
-			GLOBAL::Terminal::ANSIColor::EXPORT::DEFAULT::<&colored> // sub (Str $text, Str $) { $text };
-		}
+		my &colored = try { EVAL q{ use Terminal::ANSIColor; &colored } } // sub ($text, $) { $text }
 		method format-success(Str $output) {
 			return colored($output, 'green');
 		}
