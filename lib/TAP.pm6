@@ -725,7 +725,7 @@ package TAP {
 			}
 			multi method handle-entry(TAP::Bailout $entry) {
 				if $!bailout.defined {
-					$!bailout.keep($entry);
+					$!bailout.break($entry);
 				}
 				else {
 					$!done.break($entry);
@@ -817,7 +817,7 @@ package TAP {
 
 		class Async {
 			has Str $.name;
-			has Run $!run;
+			has Run $!run handles <kill>;
 			has State $!state;
 			has Promise $.waiter;
 
@@ -859,11 +859,6 @@ package TAP {
 				my TAP::Entry::Handler @all_handlers = $state, |@handlers;
 				my $run = get_runner($source, @all_handlers);
 				return Async.bless(:name($source.name), :$state, :$run);
-			}
-
-			method kill() {
-				$!run.kill();
-				$!waiter.break("killed") if not $!waiter;
 			}
 
 			has TAP::Result $!result;
@@ -958,7 +953,7 @@ package TAP {
 			has Promise $!killed;
 			submethod BUILD (Promise :$!waiter, Promise :$!killed) {
 			}
-			method kill(Any:D $reason = True) {
+			method kill(Any:D $reason) {
 				$!killed.break($reason);
 			}
 		}
@@ -982,20 +977,26 @@ package TAP {
 				my @working;
 				my $waiter = start {
 					my $int = $!trap ?? signal(SIGINT).tap({ $killed.break("Interrupted"); $int.close(); }) !! Tap;
-					for @sources -> $name {
-						last if $killed;
-						my $session = $reporter.open-test($name);
-						my @handlers = $session, |self.make-handlers($name);
-						my $source = self.make-source($name);
-						my $parser = TAP::Runner::Async.new(:$source, :@handlers, :$killed);
-						@working.push({ :$parser, :$session, :done($parser.waiter) });
-						next if @working < $!jobs;
-						await Promise.anyof(@working»<done>, $killed);
+					try {
+						for @sources -> $name {
+							my $session = $reporter.open-test($name);
+							my @handlers = $session, |self.make-handlers($name);
+							my $source = self.make-source($name);
+							my $parser = TAP::Runner::Async.new(:$source, :@handlers, :$killed);
+							@working.push({ :$parser, :$session, :done($parser.waiter) });
+							next if @working < $!jobs;
+							await Promise.anyof(@working»<done>, $killed);
+							reap-finished();
+						}
+						await Promise.anyof(Promise.allof(@working»<done>), $killed) if @working;
 						reap-finished();
+						CATCH {
+							when "Interrupted" {
+								reap-finished();
+								@working».<parser>».kill;
+							}
+						}
 					}
-					await Promise.anyof(Promise.allof(@working»<done>), $killed) if @working and not $killed;
-					reap-finished();
-					@working».kill if $killed;
 					$reporter.summarize($aggregator, ?$killed) if !$killed || $!trap;
 					$int.close if $int;
 					$aggregator;
@@ -1018,14 +1019,17 @@ package TAP {
 			else {
 				my $waiter = start {
 					my $int = $!trap ?? signal(SIGINT).tap({ $killed.break("Interrupted"); $int.close(); }) !! Tap;
-					for @sources -> $name {
-						last if $killed;
-						my $session = $reporter.open-test($name);
-						my @handlers = $session, |self.make-handlers($name);
-						my $source = self.make-source($name);
-						my $result = TAP::Runner::Sync.new(:$source, :@handlers).run(:$killed);
-						$aggregator.add-result($result);
-						$session.close-test($result);
+					try {
+						for @sources -> $name {
+							my $session = $reporter.open-test($name);
+							my @handlers = $session, |self.make-handlers($name);
+							my $source = self.make-source($name);
+							my $result = TAP::Runner::Sync.new(:$source, :@handlers).run(:$killed);
+							$aggregator.add-result($result);
+							$session.close-test($result);
+							$killed.result if $killed;
+						}
+						CATCH { when "Interrupted" { } }
 					}
 					$reporter.summarize($aggregator, ?$killed) if !$killed || $!trap;
 					$int.close if $int;
