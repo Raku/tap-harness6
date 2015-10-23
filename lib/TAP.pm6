@@ -146,14 +146,14 @@ package TAP {
 		has Str $.name;
 		has Int $.tests-planned;
 		has Int $.tests-run;
-		has Int @.passed;
+		has Int $.passed;
 		has Int @.failed;
 		has Str @.errors;
-		has Int @.actual-passed;
-		has Int @.actual-failed;
-		has Int @.todo;
+		has Int $.actual-passed;
+		has Int $.actual-failed;
+		has Int $.todo;
 		has Int @.todo-passed;
-		has Int @.skipped;
+		has Int $.skipped;
 		has Int $.unknowns;
 		has Bool $.skip-all;
 		has Proc $.exit-status;
@@ -174,20 +174,19 @@ package TAP {
 	}
 
 	class Aggregator {
-		has Result %.results-for;
-		has Result @!parse-order;
+		has Result %!results-for;
+		has Str @!parse-order;
 
-		has Int $.parsed = 0;
 		has Int $.tests-planned = 0;
 		has Int $.tests-run = 0;
 		has Int $.passed = 0;
 		has Int $.failed = 0;
-		has Str @.errors;
+		has Int $.errors = 0;
 		has Int $.actual-passed = 0;
 		has Int $.actual-failed = 0;
-		has Int $.todo;
-		has Int $.todo-passed;
-		has Int $.skipped;
+		has Int $.todo = 0;
+		has Int $.todo-passed = 0;
+		has Int $.skipped = 0;
 		has Bool $.exit-failed = False;
 		has Bool $.ignore-exit = False;
 
@@ -195,31 +194,34 @@ package TAP {
 			my $description = $result.name;
 			die "You already have a parser for ($description). Perhaps you have run the same test twice." if %!results-for{$description};
 			%!results-for{$description} = $result;
-			@!parse-order.push($result);
+			@!parse-order.push($result.name);
 
-			$!parsed++;
-			$!tests-planned += $result.tests-planned // 1;
+			$!tests-planned += $result.tests-planned // 0;
 			$!tests-run += $result.tests-run;
-			$!passed += $result.passed.elems;
+			$!passed += $result.passed;
 			$!failed += $result.failed.elems;
-			$!actual-passed += $result.actual-passed.elems;
-			$!actual-failed += $result.actual-failed.elems;
-			$!todo += $result.todo.elems;
+			$!actual-passed += $result.actual-passed;
+			$!actual-failed += $result.actual-failed;
+			$!todo += $result.todo;
 			$!todo-passed += $result.todo-passed.elems;
 			$!skipped += $result.skipped.elems;
-			@!errors.push(|$result.errors);
-			$!exit-failed = True if $result.exit-status && $result.exit-status.exitcode > 0;
+			$!errors += $result.errors.elems;
+			$!exit-failed = True if not $!ignore-exit and $result.wait;
 		}
 
-		method descriptions() {
-			return @!parse-order».name;
+		method result-count {
+			return +@!parse-order;
 		}
+		method results() {
+			%!results-for{@!parse-order};
+		}
+
 
 		method has-problems() {
 			return $!todo-passed || self.has-errors;
 		}
 		method has-errors() {
-			return $!failed || @!errors || $!exit-failed;
+			return $!failed || $!errors || $!exit-failed;
 		}
 		method get-status() {
 			return self.has-errors || $!tests-run != $!passed ?? 'FAILED' !! $!tests-run ?? 'PASS' !! 'NOTESTS';
@@ -398,9 +400,6 @@ package TAP {
 			return (|@now, $name, $periods).join(' ');
 		}
 		method format-summary(TAP::Aggregator $aggregator, Bool $interrupted) {
-			my @tests = $aggregator.descriptions;
-			my $total = $aggregator.tests-run;
-			my $passed = $aggregator.passed;
 			my $output = '';
 
 			if $interrupted {
@@ -411,14 +410,14 @@ package TAP {
 				$output ~= self.format-success("All tests successful.\n");
 			}
 
-			if $total != $passed || $aggregator.has-problems {
+			if $aggregator.has-problems {
 				$output ~= "\nTest Summary Report";
 				$output ~= "\n-------------------\n";
-				for @tests -> $name {
-					my $result = $aggregator.results-for{$name};
+				for $aggregator.results -> $result {
+					my $name = $result.name;
 					if $result.has-problems {
 						my $spaces = ' ' x min($!longest - $name.chars, 1);
-						my $wait = $result.exit-status ?? 0 // '(none)' !! '(none)';
+						my $wait = $result.wait // '(none)';
 						my $line = "$name$spaces (Wstat: $wait Tests: {$result.tests-run} Failed: {$result.failed.elems})\n";
 						$output ~= $result.has-problems	?? self.format-failure($line) !! $line;
 
@@ -428,25 +427,22 @@ package TAP {
 						if $result.todo-passed -> @todo-passed {
 							$output ~= "  TODO passed:  { @todo-passed.join(' ') }\n";
 						}
-						if $result.exit-status && !$aggregator.ignore-exit {
+						if $result.wait -> $wait {
 							if $result.exit {
 								$output ~= self.format-failure("Non-zero exit status: { $result.exit }\n");
 							}
-							elsif $result.wait {
-								$output ~= self.format-failure("Non-zero wait status: { $result.wait }\n");
+							else {
+								$output ~= self.format-failure("Non-zero wait status: $wait\n");
 							}
 						}
-						if $result.errors -> @errors {
-							my ($head, @tail) = @errors;
+						if $result.errors -> @ ($head, *@tail) {
 							$output ~= self.format-failure("  Parse errors: $head\n");
-							for @tail -> $error {
-								$output ~= self.format-failure(' ' x 16 ~ $error ~ "\n");
-							}
+							$output ~= @tail.map({ self.format-failure(' ' x 16 ~ $_ ~ "\n") }).join('');
 						}
 					}
 				}
 			}
-			$output ~= "Files={ @tests.elems }, Tests=$total\n";
+			$output ~= "Files={ $aggregator.result-count }, Tests={ $aggregator.tests-run }\n";
 			my $status = $aggregator.get-status;
 			$output ~= "Result: $status\n";
 			return $output;
@@ -496,8 +492,8 @@ package TAP {
 				}
 			}
 
-			if $result.skipped.elems -> $skipped {
-				my $passed = $result.passed.elems - $skipped;
+			if $result.skipped -> $skipped {
+				my $passed = $result.passed - $skipped;
 				my $test = 'subtest' ~ ( $skipped != 1 ?? 's' !! '' );
 				$output ~= "\n\t(less $skipped skipped $test: $passed okay)";
 			}
@@ -654,14 +650,14 @@ package TAP {
 			has Range $.allowed-versions = 12 .. 13;
 			has Int $!tests-planned;
 			has Int $!tests-run = 0;
-			has Int @!passed;
+			has Int $!passed = 0;
 			has Int @!failed;
 			has Str @!errors;
-			has Int @!actual-passed;
-			has Int @!actual-failed;
-			has Int @!todo;
+			has Int $!actual-passed = 0;
+			has Int $!actual-failed = 0;
+			has Int $!todo = 0;
 			has Int @!todo-passed;
-			has Int @!skipped;
+			has Int $!skipped = 0;
 			has Int $!unknowns = 0;
 			has Bool $!skip-all = False;
 
@@ -711,11 +707,16 @@ package TAP {
 				}
 
 				my $usable-number = $found-number // $expected-number;
-				($test.is-ok ?? @!passed !! @!failed).push($usable-number);
-				($test.ok ?? @!actual-passed !! @!actual-failed).push($usable-number);
-				@!todo.push($usable-number) if $test.directive == TAP::Todo;
+				if $test.is-ok {
+					$!passed++;
+				}
+				else {
+					@!failed.push($usable-number);
+				}
+				($test.ok ?? $!actual-passed !! $!actual-failed)++;
+				$!todo++ if $test.directive == TAP::Todo;
 				@!todo-passed.push($usable-number) if $test.ok && $test.directive == TAP::Todo;
-				@!skipped.push($usable-number) if $test.directive == TAP::Skip;
+				$!skipped++ if $test.directive == TAP::Skip;
 
 				if $test ~~ TAP::Sub-Test {
 					for $test.inconsistencies(~$usable-number) -> $error {
@@ -747,8 +748,8 @@ package TAP {
 				$!done.keep;
 			}
 			method finalize(Str $name, Proc $exit-status, Duration $time) {
-				return TAP::Result.new(:$name, :$!tests-planned, :$!tests-run, :@!passed, :@!failed, :@!errors, :$!skip-all,
-					:@!actual-passed, :@!actual-failed, :@!todo, :@!todo-passed, :@!skipped, :$!unknowns, :$exit-status, :$time);
+				return TAP::Result.new(:$name, :$!tests-planned, :$!tests-run, :$!passed, :@!failed, :@!errors, :$!skip-all,
+					:$!actual-passed, :$!actual-failed, :$!todo, :@!todo-passed, :$!skipped, :$!unknowns, :$exit-status, :$time);
 			}
 			method !add-error(Str $error) {
 				push @!errors, $error;
