@@ -25,15 +25,16 @@ multi sub MAIN(
 	*@files) {
 	@files = 't' if not @files;
 
-	my @extra = (%*ENV<PERL6LIB> // '').split($path-sep);
-	@extra.unshift($*CWD ~ '/lib') if $lib;
-	@extra.unshift($*CWD ~ '/blib/lib') if $blib;
-	@extra.unshift($incdir) with $incdir;
-	%*ENV<PERL6LIB> = @extra.join($path-sep) if @extra;
-
 	my %more;
 	with $exec {
 		%more<handlers> = [ TAP::Harness::SourceHandler::Exec.new($exec.words) ];
+	}
+	else {
+		my @incdirs;
+		@incdirs.unshift($*CWD ~ '/lib') if $lib;
+		@incdirs.unshift($*CWD ~ '/blib/lib') if $blib;
+		@incdirs.unshift($incdir) with $incdir;
+		%more<handlers> = [ TAP::Harness::SourceHandler::Perl6.new(:@incdirs) ];
 	}
 	my $harness-class = $harness ?? load($harness) !! TAP::Harness;
 	with $reporter {
@@ -48,7 +49,15 @@ multi sub MAIN(
 
 multi sub MAIN(Bool :$help!) {
 	require Pod::To::Text;
-	say ::('Pod::To::Text').render($=pod[0]);
+	my $text = ::('Pod::To::Text').render($=pod[0]);
+	with %*ENV<PERLDOC_PAGER> // %*ENV<PAGER> -> $pager {
+		my $proc = shell($pager, :in);
+		$proc.in.print($text);
+		$proc.in.close;
+	}
+	else {
+		say $text;
+	}
 }
 multi sub MAIN(Bool :$version!) {
 	say "prove6 0.0.1 with TAP::Harness 0.001 on $*PERL";
