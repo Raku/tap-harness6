@@ -960,9 +960,19 @@ package TAP {
 			}
 		}
 
+		method make-aggregator() {
+			return TAP::Aggregator.new(:$!ignore-exit);
+		}
+		method make-handlers(Str $name) {
+			return ();
+		}
+		method make-source(Str $name) {
+			return @!handlers.max(*.can-handle($name)).make-source($name, :$!err, :$!merge);
+		}
+
 		method run(*@sources) {
 			my $killed = Promise.new;
-			my $aggregator = TAP::Aggregator.new(:$!ignore-exit);
+			my $aggregator = self.make-aggregator;
 			my $reporter = $!reporter-class.new(:parallel($!jobs > 1), :names(@sources), :$!timer);
 			if $!jobs > 1 {
 				my @working;
@@ -970,8 +980,9 @@ package TAP {
 					for @sources -> $name {
 						last if $killed;
 						my $session = $reporter.open-test($name);
-						my $source = @!handlers.max(*.can-handle($name)).make-source($name, :$!err, :$!merge);
-						my $parser = TAP::Runner::Async.new(:$source, :handlers[$session], :$killed);
+						my @handlers = $session, |self.make-handlers($name);
+						my $source = self.make-source($name);
+						my $parser = TAP::Runner::Async.new(:$source, :@handlers, :$killed);
 						@working.push({ :$parser, :$session, :done($parser.waiter) });
 						next if @working < $!jobs;
 						await Promise.anyof(@working»<done>, $killed);
@@ -1003,9 +1014,9 @@ package TAP {
 					for @sources -> $name {
 						last if $killed;
 						my $session = $reporter.open-test($name);
-						my $source = @!handlers.max(*.can-handle($name)).make-source($name, :$!err, :$!merge);
-						my $parser = TAP::Runner::Sync.new(:$source, :handlers[$session]);
-						my $result = $parser.run(:$killed);
+						my @handlers = $session, |self.make-handlers($name);
+						my $source = self.make-source($name);
+						my $result = TAP::Runner::Sync.new(:$source, :@handlers).run(:$killed);
 						$aggregator.add-result($result);
 						$session.close-test($result);
 					}
