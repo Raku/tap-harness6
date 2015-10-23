@@ -949,14 +949,15 @@ package TAP {
 		has Any $.err = '-';
 		has Bool $.merge = False;
 		has Bool $.ignore-exit = False;
+		has Bool $.trap = False;
 
 		class Run {
 			has Promise $.waiter handles <result>;
 			has Promise $!killed;
 			submethod BUILD (Promise :$!waiter, Promise :$!killed) {
 			}
-			method kill(Any $reason = True) {
-				$!killed.keep($reason);
+			method kill(Any:D $reason = True) {
+				$!killed.break($reason);
 			}
 		}
 
@@ -974,9 +975,11 @@ package TAP {
 			my $killed = Promise.new;
 			my $aggregator = self.make-aggregator;
 			my $reporter = $!reporter-class.new(:parallel($!jobs > 1), :names(@sources), :$!timer);
+
 			if $!jobs > 1 {
 				my @working;
 				my $waiter = start {
+					my $int = $!trap ?? signal(SIGINT).tap({ $killed.break("Interrupted"); $int.close(); }) !! Tap;
 					for @sources -> $name {
 						last if $killed;
 						my $session = $reporter.open-test($name);
@@ -991,7 +994,8 @@ package TAP {
 					await Promise.anyof(Promise.allof(@working»<done>), $killed) if @working and not $killed;
 					reap-finished();
 					@working».kill if $killed;
-					$reporter.summarize($aggregator, ?$killed);
+					$reporter.summarize($aggregator, ?$killed) if !$killed || $!trap;
+					$int.close if $int;
 					$aggregator;
 				}
 				sub reap-finished() {
@@ -1011,6 +1015,7 @@ package TAP {
 			}
 			else {
 				my $waiter = start {
+					my $int = $!trap ?? signal(SIGINT).tap({ $killed.break("Interrupted"); $int.close(); }) !! Tap;
 					for @sources -> $name {
 						last if $killed;
 						my $session = $reporter.open-test($name);
@@ -1020,7 +1025,8 @@ package TAP {
 						$aggregator.add-result($result);
 						$session.close-test($result);
 					}
-					$reporter.summarize($aggregator, ?$killed);
+					$reporter.summarize($aggregator, ?$killed) if !$killed || $!trap;
+					$int.close if $int;
 					$aggregator;
 				}
 				return Run.new(:$waiter, :$killed);
