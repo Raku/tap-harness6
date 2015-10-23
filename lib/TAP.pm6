@@ -367,7 +367,7 @@ package TAP {
 		has Formatter::Volume $.volume = Normal;
 	}
 	role Reporter {
-		method summarize(TAP::Aggregator, Bool $interrupted) { ... }
+		method summarize(TAP::Aggregator, Bool $interrupted, Duration $duration) { ... }
 		method open-test(Str $) { ... }
 	}
 
@@ -399,7 +399,7 @@ package TAP {
 			my @now = $.timer ?? ~DateTime.new(now, :formatter{ '[' ~ .hour ~ ':' ~ .minute ~ ':' ~ .second.Int ~ ']' }) !! ();
 			return (|@now, $name, $periods).join(' ');
 		}
-		method format-summary(TAP::Aggregator $aggregator, Bool $interrupted) {
+		method format-summary(TAP::Aggregator $aggregator, Bool $interrupted, Duration $duration) {
 			my $output = '';
 
 			if $interrupted {
@@ -442,7 +442,8 @@ package TAP {
 					}
 				}
 			}
-			$output ~= "Files={ $aggregator.result-count }, Tests={ $aggregator.tests-run }\n";
+			my $timing = $duration.defined ?? ",  { $duration.Int } wallclock secs" !! '';
+			$output ~= "Files={ $aggregator.result-count }, Tests={ $aggregator.tests-run }$timing\n";
 			my $status = $aggregator.get-status;
 			$output ~= "Result: $status\n";
 			return $output;
@@ -519,8 +520,8 @@ package TAP {
 			my $header = $!formatter.format-name($name);
 			return Formatter::Text::Session.new(:$name, :$header, :formatter(self));
 		}
-		method summarize(TAP::Aggregator $aggregator, Bool $interrupted) {
-			self!output($!formatter.format-summary($aggregator, $interrupted));
+		method summarize(TAP::Aggregator $aggregator, Bool $interrupted, Duration $duration) {
+			self!output($!formatter.format-summary($aggregator, $interrupted, $duration));
 		}
 		method !output(Any $value) {
 			$!handle.print($value);
@@ -617,8 +618,8 @@ package TAP {
 				@!active = @!active.grep(* !=== $session);
 				output-ruler(True) if @!active.elems > 1;
 			}
-			multi receive('summary', TAP::Aggregator $aggregator, Bool $interrupted) {
-				$handle.print($!formatter.format-summary($aggregator, $interrupted));
+			multi receive('summary', TAP::Aggregator $aggregator, Bool $interrupted, Duration $duration) {
+				$handle.print($!formatter.format-summary($aggregator, $interrupted, $duration));
 			}
 
 			$!events.act(-> @args { receive(|@args) });
@@ -633,8 +634,8 @@ package TAP {
 		method print-result(Reporter::Console::Session $session, TAP::Result $result) {
 			$!events.emit(['result', $session, $result]);
 		}
-		method summarize(TAP::Aggregator $aggregator, Bool $interrupted) {
-			$!events.emit(['summary', $aggregator, $interrupted]);
+		method summarize(TAP::Aggregator $aggregator, Bool $interrupted, Duration $duration) {
+			$!events.emit(['summary', $aggregator, $interrupted, $duration]);
 		}
 
 		method open-test(Str $name) {
@@ -978,6 +979,7 @@ package TAP {
 				my @working;
 				my $waiter = start {
 					my $int = $!trap ?? signal(SIGINT).tap({ $killed.break("Interrupted"); $int.close(); }) !! Tap;
+					my $begin = now;
 					try {
 						for @sources -> $name {
 							my $session = $reporter.open-test($name);
@@ -998,7 +1000,7 @@ package TAP {
 							}
 						}
 					}
-					$reporter.summarize($aggregator, ?$killed) if !$killed || $!trap;
+					$reporter.summarize($aggregator, ?$killed, now - $begin) if !$killed || $!trap;
 					$int.close if $int;
 					$aggregator;
 				}
@@ -1020,6 +1022,7 @@ package TAP {
 			else {
 				my $waiter = start {
 					my $int = $!trap ?? signal(SIGINT).tap({ $killed.break("Interrupted"); $int.close(); }) !! Tap;
+					my $begin = now;
 					try {
 						for @sources -> $name {
 							my $session = $reporter.open-test($name);
@@ -1032,7 +1035,7 @@ package TAP {
 						}
 						CATCH { when "Interrupted" { } }
 					}
-					$reporter.summarize($aggregator, ?$killed) if !$killed || $!trap;
+					$reporter.summarize($aggregator, ?$killed, now - $begin) if !$killed || $!trap;
 					$int.close if $int;
 					$aggregator;
 				}
