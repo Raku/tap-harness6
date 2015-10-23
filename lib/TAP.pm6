@@ -920,25 +920,27 @@ package TAP {
 			method can-handle {...};
 			method make-source {...};
 		}
-		class SourceHandler::Perl6 does SourceHandler {
-			has @.incdirs;
-			method can-handle($name) {
-				return 0.5;
-			}
-			method make-source($name, :$err, Bool :$merge) {
-				my @args = |@!incdirs.map("-I" ~ *), $name;
-				return TAP::Runner::Source::Proc.new(:$name, :path(~$*EXECUTABLE), :@args, :$err, :$merge);
+		role SourceHandler::Proc does SourceHandler {
+			has Str:D $.path is required;
+			has @.args;
+			method make-source(Str:D $name, Any:D :$err, Bool:D :$merge) {
+				return TAP::Runner::Source::Proc.new(:$name, :$!path, :args[ |@!args, $name ], :$err, :$merge);
 			}
 		}
-		class SourceHandler::Exec does SourceHandler {
-			has $.path;
-			has @.args;
-			method can-handle($name) {
-				return 0.4;
+		class SourceHandler::Perl6 does SourceHandler::Proc {
+			submethod BUILD(:@incdirs, Str:D :$!path = ~$*EXECUTABLE) {
+				@!args = @incdirs.map("-I" ~ *);
 			}
-			method make-source($name, :$err, Bool :$merge) {
-				my @args = |@!args, $name;
-				return TAP::Runner::Source::Proc.new(:$name, :$!path, :@args, :$err, :$merge);
+			method can-handle(Str $name) {
+				return 0.5;
+			}
+		}
+		class SourceHandler::Exec does SourceHandler::Proc {
+			method new (*@ ($path, *@args)) {
+				return self.bless(:$path, :@args);
+			}
+			method can-handle(Str $name) {
+				return 1;
 			}
 		}
 
