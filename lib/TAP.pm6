@@ -1,3 +1,5 @@
+use v6;
+
 package TAP {
 	role Entry {
 		has Str $.raw;
