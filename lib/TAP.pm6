@@ -792,6 +792,9 @@ package TAP {
 		class Source::String does Source {
 			has Str $.content;
 		}
+		class Source::Supply does Source {
+			has Supply $.supply;
+		}
 		class Source::Through does Source does TAP::Entry::Handler {
 			has Promise $.done = Promise.new;
 			has TAP::Entry @!entries;
@@ -827,28 +830,36 @@ package TAP {
 
 			multi get_runner(Source::Proc $proc; TAP::Entry::Handler @handlers) {
 				my $async = Proc::Async.new($proc.path, $proc.args);
-				my $lexer = TAP::Parser.new(:@handlers);
-				$async.stdout().act({ $lexer.add-data($^data) }, :done({ $lexer.close-data() }));
-				my $process = $async.start();
+				my $parser = TAP::Parser.new(:@handlers);
+				$async.stdout().act({ $parser.add-data($^data) }, :done({ $parser.close-data() }));
+				my $process = $async.start;
 				my $start-time = now;
 				my $timer = $process.then({ now - $start-time });
 				return Run.new(:$process, :killer($async), :$timer);
+			}
+			multi get_runner(Source::Supply $supply; TAP::Entry::Handler @handlers) {
+				my $parser = TAP::Parser.new(:@handlers);
+				my $start-time = now;
+				my $process = Promise.new;
+				my $timer = $process.then({ now - $start-time });
+				$supply.supply.act({ $parser.add-data($^data) }, :done({ $parser.close-data(); $process.keep }));
+				return Run.new(:$process, :$timer);
 			}
 			multi get_runner(Source::Through $through; TAP::Entry::Handler @handlers) {
 				$through.staple(@handlers);
 				return Run.new(:process($through.promise));
 			}
 			multi get_runner(Source::File $file; TAP::Entry::Handler @handlers) {
-				my $lexer = TAP::Parser.new(:@handlers);
+				my $parser = TAP::Parser.new(:@handlers);
 				return Run.new(:process(start {
-					$lexer.add-data($file.filename.IO.slurp);
-					$lexer.close-data();
+					$parser.add-data($file.filename.IO.slurp);
+					$parser.close-data();
 				}));
 			}
 			multi get_runner(Source::String $string; TAP::Entry::Handler @handlers) {
-				my $lexer = TAP::Parser.new(:@handlers);
-				$lexer.add-data($string.content);
-				$lexer.close-data();
+				my $parser = TAP::Parser.new(:@handlers);
+				$parser.add-data($string.content);
+				$parser.close-data();
 				my $done = Promise.new;
 				$done.keep;
 				return Run.new(:process($done));
@@ -887,6 +898,13 @@ package TAP {
 						}
 						$parser.close-data();
 						return $state.finalize($!name, $proc, now - $start-time);
+					}
+					when Source::Supply {
+						my $parser = TAP::Parser.new(:@handlers);
+						my $start-time = now;
+						$!source.supply.act({ $parser.add-data($^data) }, :done({ $parser.close-data() }));
+						await $!source.supply;
+						return $state.finalize($!name, Proc, now - $start-time);
 					}
 					when Source::Through {
 						$!source.staple(@handlers);
