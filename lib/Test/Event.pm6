@@ -5,7 +5,7 @@ package Test {
 	}
 
 	class Event::Plan does Event {
-		has Int:D $.tests;
+		has Int $.tests;
 		has Bool $.skip-all;
 		has Str $.explanation;
 	}
@@ -18,7 +18,7 @@ package Test {
 	}
 
 	class Event::Comment does Event {
-		has Str:D $.content;
+		has Str $.content;
 	}
 
 }

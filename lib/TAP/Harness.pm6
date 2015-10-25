@@ -120,7 +120,7 @@ package TAP::Runner {
 	my class Run {
 		subset Killable of Any where *.can('kill');
 		has Killable $!process;
-		has Promise:D $.done;
+		has Promise $.done;
 		has Promise $.timer;
 		method kill() {
 			$!process.kill if $!process;
@@ -281,7 +281,7 @@ class TAP::Harness {
 
 	has SourceHandler @.handlers = SourceHandler::Perl6.new();
 	has Any @.sources;
-	has TAP::Reporter:T $.reporter-class = TAP::Reporter::Console;
+	has TAP::Reporter $.reporter-class = TAP::Reporter::Console;
 
 	class Run {
 		has Promise $.done handles <result>;
