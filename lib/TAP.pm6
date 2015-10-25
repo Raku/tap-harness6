@@ -572,7 +572,6 @@ package TAP {
 		}
 	}
 	class Reporter::Console does Reporter {
-		has Bool $.parallel;
 		has Formatter::Console $!formatter;
 		has Int $!lastlength;
 		has Supply $events;
@@ -972,7 +971,7 @@ package TAP {
 		method run(*@sources) {
 			my $killed = Promise.new;
 			my $aggregator = self.make-aggregator;
-			my $reporter = $!reporter-class.new(:parallel($!jobs > 1), :names(@sources), :$!timer);
+			my $reporter = $!reporter-class.new(:names(@sources), :$!timer);
 
 			if $!jobs > 1 {
 				my @working;
