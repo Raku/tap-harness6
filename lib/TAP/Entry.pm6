@@ -7,7 +7,7 @@ package TAP {
 		}
 	}
 	class Version does Entry {
-		has Int:D $.version;
+		has Int $.version;
 		method to-string() {
 			return "TAP Version $!version";
 		}
@@ -25,7 +25,7 @@ package TAP {
 	subset Directive::Explanation of Str where { not .defined or m/ ^ \N* $ / };
 
 	class Test does Entry {
-		has Bool:D $.ok;
+		has Bool $.ok;
 		has Int $.number;
 		has Str $.description;
 		has Directive:D $.directive = No-Directive;
@@ -75,13 +75,13 @@ package TAP {
 		}
 	}
 	class Comment does Entry {
-		has Str:D $.comment;
+		has Str $.comment;
 		method to-string {
 			return "# $!comment";
 		}
 	}
 	class YAML does Entry {
-		has Str:D $.serialized;
+		has Str $.serialized;
 		has Any $.deserialized;
 		method to-string {
 			return "  ---\n" ~ $!serialized.indent(2) ~~ '  ...'
