@@ -1002,12 +1002,12 @@ package TAP {
 
 		has SourceHandler @.handlers = SourceHandler::Perl6.new();
 		has TAP::Reporter:U $.reporter-class = TAP::Reporter::Console;
-		has Int $.jobs = 1;
-		has Bool $.timer = False;
-		subset ErrValue where any(IO::Handle:D, Supply:D, 'stderr', 'ignore', 'merge');
+		has Int:D $.jobs = 1;
+		has Bool:D $.timer = False;
+		subset ErrValue where any(IO::Handle:D, Supply, 'stderr', 'ignore', 'merge');
 		has ErrValue $.err = 'stderr';
-		has Bool $.ignore-exit = False;
-		has Bool $.trap = False;
+		has Bool:D $.ignore-exit = False;
+		has Bool:D $.trap = False;
 
 		class Run {
 			has Promise $.waiter handles <result>;

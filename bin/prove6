@@ -18,7 +18,7 @@ sub load(Str $classname) {
 }
 
 multi sub MAIN(
-	Bool :l($lib), Bool :b($blib), Bool :$timer, Int :j($jobs) = 1,
+	Bool :l($lib), Bool :b($blib), Bool :$timer = False, Int :j($jobs) = 1,
 	Bool :$ignore-exit = False, Bool :$trap = False,
 	Bool :$shuffle = False, Str :$err = 'stderr', Bool :$reverse = False,
 	Str :e($exec), Str :$harness, Str :$reporter, Str :I($incdir),
