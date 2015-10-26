@@ -783,8 +783,7 @@ package TAP {
 		class Source::Proc does Source {
 			has Str $.path is required;
 			has @.args;
-			has $.err = '-';
-			has Bool $.merge = False;
+			has $.err is required;
 		}
 		class Source::File does Source {
 			has Str $.filename;
@@ -832,6 +831,26 @@ package TAP {
 				my $async = Proc::Async.new($proc.path, $proc.args);
 				my $parser = TAP::Parser.new(:@handlers);
 				$async.stdout().act({ $parser.add-data($^data) }, :done({ $parser.close-data() }));
+				given $proc.err -> $err {
+					when 'stderr' { #default is correct
+					}
+					when 'merge' {
+						warn "Merging isn't supported yet on Asynchronous streams";
+						$async.stderr({});
+					}
+					when 'ignore' {
+						$async.stderr({});
+					}
+					when IO::Handle:D {
+						$async.stderr.lines.act({ $err.say($_) });
+					}
+					when Supply:D {
+						$async.stderr.act({ $err.emit($_) }, :done({ $err.done }), :quit({ $err.quit($^reason) }));
+					}
+					default {
+						die "Unknown error handler";
+					}
+				}
 				my $process = $async.start;
 				my $start-time = now;
 				my $timer = $process.then({ now - $start-time });
@@ -891,8 +910,32 @@ package TAP {
 				my $start-time = now;
 				given $!source {
 					when Source::Proc {
+						my $proc = do given $!source.err {
+							when 'merge' {
+								run($!source.path, $!source.args, :out, :!chomp, :merge);
+							}
+							when 'stderr' {
+								run($!source.path, $!source.args, :out, :!chomp);
+							}
+							when 'ignore' {
+								run($!source.path, $!source.args, :out, :!chomp, :!err);
+							}
+							when Supply:D {
+								my $tmp = run($!source.path, $!source.args, :out, :!chomp, :err);
+								start {
+									$!source.err.emit($_) for $tmp.err.lines;
+									$!source.err.done;
+								}
+								$tmp;
+							}
+							when IO::Handle:D {
+								run($!source.path, $!source.args, :out, :!chomp, :err($!source.err));
+							}
+							default {
+								die "Unknown error handler { $!source.err }";
+							}
+						}
 						my $parser = TAP::Parser.new(:@handlers);
-						my $proc = run($!source.path, $!source.args, :out, :err($!source.err), :merge($!source.merge), :!chomp);
 						for $proc.out.lines -> $line {
 							$parser.add-data($line);
 						}
@@ -936,8 +979,8 @@ package TAP {
 		role SourceHandler::Proc does SourceHandler {
 			has Str:D $.path is required;
 			has @.args;
-			method make-source(Str:D $name, Any:D :$err, Bool:D :$merge) {
-				return TAP::Runner::Source::Proc.new(:$name, :$!path, :args[ |@!args, $name ], :$err, :$merge);
+			method make-source(Str:D $name, Any:D :$err) {
+				return TAP::Runner::Source::Proc.new(:$name, :$!path, :args[ |@!args, $name ], :$err);
 			}
 		}
 		class SourceHandler::Perl6 does SourceHandler::Proc {
@@ -961,8 +1004,8 @@ package TAP {
 		has TAP::Reporter:U $.reporter-class = TAP::Reporter::Console;
 		has Int $.jobs = 1;
 		has Bool $.timer = False;
-		has Any $.err = '-';
-		has Bool $.merge = False;
+		subset ErrValue where any(IO::Handle:D, Supply:D, 'stderr', 'ignore', 'merge');
+		has ErrValue $.err = 'stderr';
 		has Bool $.ignore-exit = False;
 		has Bool $.trap = False;
 
@@ -983,7 +1026,7 @@ package TAP {
 			return ();
 		}
 		method make-source(Str $name) {
-			return @!handlers.max(*.can-handle($name)).make-source($name, :$!err, :$!merge);
+			return @!handlers.max(*.can-handle($name)).make-source($name, :$!err);
 		}
 
 		method run(*@sources) {

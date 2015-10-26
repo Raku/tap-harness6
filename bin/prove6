@@ -20,10 +20,11 @@ sub load(Str $classname) {
 multi sub MAIN(
 	Bool :l($lib), Bool :b($blib), Bool :$timer, Int :j($jobs) = 1,
 	Bool :$ignore-exit = False, Bool :$trap = False,
-	Bool :$shuffle = False, Bool :$merge = False, Bool :$reverse = False,
+	Bool :$shuffle = False, Str :$err = 'stderr', Bool :$reverse = False,
 	Str :e($exec), Str :$harness, Str :$reporter, Str :I($incdir),
 	*@files) {
 	@files = 't' if not @files;
+	die "Invalid value '$err' for --err\n" if $err ne any('stderr','merge','ignore');
 
 	my %more;
 	with $exec {
@@ -43,7 +44,7 @@ multi sub MAIN(
 	my @sources = @files.map(*.IO).flatmap(&listall);
 	@sources = $shuffle ?? @sources.pick(*) !! @sources.sort;
 	@sources = @sources.reverse if $reverse;
-	my $run = $harness-class.new(:$jobs, :$timer, :$ignore-exit, :$merge, |%more).run(@sources);
+	my $run = $harness-class.new(:$jobs, :$timer, :$ignore-exit, :$err, |%more).run(@sources);
 	return min($run.result.failed, 254);
 }
 
@@ -83,7 +84,6 @@ Boolean options:
                         your tests
       --shuffle         Run the tests in random order.
       --ignore-exit     Ignore exit status from test scripts.
-      --merge           Merge test scripts' STDERR with their STDOUT.
       --reverse         Run the tests in reverse order.
       --timer           Print elapsed time after each test.
       --trap            Trap Ctrl-C and print summary on interrupt.
@@ -97,6 +97,9 @@ Options that take arguments:
       --harness         Define test harness to use.  See TAP::Harness.
       --reporter        Result reporter to use. See REPORTERS.
  -j,                    Run N test jobs in parallel (try 9.)
+      --err=stdout      Direct the test's $*ERR to the harness' $*ERR.
+      --err=merge       Merge test scripts' $*ERR with their $*OUT.
+      --err=ignore      Ignore test script' $*ERR.
 
 =head1 NOTES
 
@@ -128,7 +131,15 @@ switch:
  prove --exec '/usr/bin/perl -Tw -mstrict -Ilib' t/
  prove --exec '/path/to/my/customer/exec'
 
-=head2 C<--merge>
+=head2 C<--err={stderr,merge,ignore}>
+
+=over 4
+
+=item stderr
+
+
+
+=item merge
 
 If you need to make sure your diagnostics are displayed in the correct
 order relative to test results you can use the C<--merge> option to
