@@ -1028,6 +1028,7 @@ package TAP {
 		method make-source(Str $name) {
 			return @!handlers.max(*.can-handle($name)).make-source($name, :$!err);
 		}
+		my &sigint = do try { EVAL 'sub { signal(SIGINT) }' } or sub { Supply.new };
 
 		method run(*@sources) {
 			my $killed = Promise.new;
@@ -1037,7 +1038,7 @@ package TAP {
 			if $!jobs > 1 {
 				my @working;
 				my $waiter = start {
-					my $int = $!trap ?? signal(SIGINT).tap({ $killed.break("Interrupted"); $int.close(); }) !! Tap;
+					my $int = $!trap ?? sigint().tap({ $killed.break("Interrupted"); $int.close(); }) !! Tap;
 					my $begin = now;
 					try {
 						for @sources -> $name {
@@ -1080,7 +1081,7 @@ package TAP {
 			}
 			else {
 				my $waiter = start {
-					my $int = $!trap ?? signal(SIGINT).tap({ $killed.break("Interrupted"); $int.close(); }) !! Tap;
+					my $int = $!trap ?? sigint().tap({ $killed.break("Interrupted"); $int.close(); }) !! Tap;
 					my $begin = now;
 					try {
 						for @sources -> $name {
