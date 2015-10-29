@@ -167,8 +167,8 @@ package TAP {
 			return $!exit-status.defined ?? $!exit-status.status !! Int;
 		}
 
-		method has-problems() {
-			return @!failed || @!errors || self.exit-failed;
+		method has-problems($ignore-exit) {
+			return @!failed || @!errors || (!$ignore-exit && self.exit-failed);
 		}
 		method exit-failed() {
 			return $!exit-status.defined && $!exit-status.status;
@@ -367,6 +367,7 @@ package TAP {
 	role Formatter {
 		has Bool $.timer = False;
 		has Formatter::Volume $.volume = Normal;
+		has Bool $.ignore-exit;
 	}
 	role Reporter {
 		method summarize(TAP::Aggregator, Bool $interrupted, Duration $duration) { ... }
@@ -417,11 +418,11 @@ package TAP {
 				$output ~= "\n-------------------\n";
 				for $aggregator.results -> $result {
 					my $name = $result.name;
-					if $result.has-problems {
+					if $result.has-problems($!ignore-exit) {
 						my $spaces = ' ' x min($!longest - $name.chars, 1);
 						my $wait = $result.wait // '(none)';
 						my $line = "$name$spaces (Wstat: $wait Tests: {$result.tests-run} Failed: {$result.failed.elems})\n";
-						$output ~= $result.has-problems	?? self.format-failure($line) !! $line;
+						$output ~= self.format-failure($line);
 
 						if $result.failed -> @failed {
 							$output ~= self.format-failure('  Failed tests:  ' ~ @failed.join(' ') ~ "\n");
@@ -465,7 +466,7 @@ package TAP {
 			if ($result.skip-all) {
 				$output = self.format-return("$name skipped");
 			}
-			elsif ($result.has-problems) {
+			elsif ($result.has-problems($!ignore-exit)) {
 				$output = self.format-test-failure($name, $result);
 			}
 			else {
@@ -481,7 +482,7 @@ package TAP {
 			my $total = $result.tests-planned // $result.tests-run;
 			my $failed = $result.failed + abs($total - $result.tests-run);
 
-			if $result.exit -> $status {
+			if !$!ignore-exit && $result.exit -> $status {
 				$output ~= self.format-failure("Dubious, test returned $status\n");
 			}
 
@@ -514,8 +515,8 @@ package TAP {
 		has IO::Handle $!handle;
 		has Formatter::Text $!formatter;
 
-		submethod BUILD(:@names, :$!handle = $*OUT, :$volume = Normal, :$timer = False) {
-			$!formatter = Formatter::Text.new(:@names, :$volume, :$timer);
+		submethod BUILD(:@names, :$!handle = $*OUT, :$volume = Normal, :$timer = False, Bool :$ignore-exit) {
+			$!formatter = Formatter::Text.new(:@names, :$volume, :$timer, :$ignore-exit);
 		}
 
 		method open-test(Str $name) {
@@ -579,8 +580,8 @@ package TAP {
 		has Int $!tests;
 		has Int $!fails;
 
-		submethod BUILD(:@names, IO::Handle :$handle = $*OUT, :$volume = Normal, :$timer = False) {
-			$!formatter = Formatter::Console.new(:@names, :$volume, :$timer);
+		submethod BUILD(:@names, IO::Handle :$handle = $*OUT, :$volume = Normal, :$timer = False, Bool :$ignore-exit = False) {
+			$!formatter = Formatter::Console.new(:@names, :$volume, :$timer, :$ignore-exit);
 			$!lastlength = 0;
 			$!events = Supply.new;
 			@!active .= new;
@@ -1033,7 +1034,7 @@ package TAP {
 		method run(*@sources) {
 			my $killed = Promise.new;
 			my $aggregator = self.make-aggregator;
-			my $reporter = $!reporter-class.new(:names(@sources), :$!timer);
+			my $reporter = $!reporter-class.new(:names(@sources), :$!timer, :$!ignore-exit);
 
 			if $!jobs > 1 {
 				my @working;
