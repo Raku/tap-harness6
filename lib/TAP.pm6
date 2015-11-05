@@ -365,9 +365,9 @@ package TAP {
 
 	enum Formatter::Volume <Silent ReallyQuiet Quiet Normal Verbose>;
 	role Formatter {
-		has Bool $.timer = False;
+		has Bool:D $.timer = False;
 		has Formatter::Volume $.volume = Normal;
-		has Bool $.ignore-exit;
+		has Bool:D $.ignore-exit = False;
 	}
 	role Reporter {
 		method summarize(TAP::Aggregator, Bool $interrupted, Duration $duration) { ... }
