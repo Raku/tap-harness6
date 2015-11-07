@@ -325,8 +325,7 @@ package TAP {
 		}
 		method yaml($/) {
 			my $serialized = $<yaml-line>.join('');
-			require YAMLish;
-			my $deserialized = YAMLish::load-yaml("---\n$serialized...");
+			my $deserialized = try (require YAMLish) ?? YAMLish::load-yaml("---\n$serialized...") !! Any;
 			make TAP::YAML.new(:raw(~$/), :$serialized, :$deserialized);
 		}
 		method sub-entry($/) {
