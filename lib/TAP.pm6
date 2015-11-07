@@ -831,7 +831,8 @@ package TAP {
 				my $async = Proc::Async.new($proc.path, $proc.args);
 				my $parser = TAP::Parser.new(:@handlers);
 				$async.stdout().act({ $parser.add-data($^data) }, :done({ $parser.close-data() }));
-				given $proc.err -> $err {
+				given $proc.err {
+					my $err = $_;
 					when 'stderr' { #default is correct
 					}
 					when 'merge' {
