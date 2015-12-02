@@ -574,7 +574,7 @@ class Reporter::Console::Session does Reporter::Text::Session {
 class Reporter::Console does Reporter {
 	has Formatter::Console $!formatter;
 	has Int $!lastlength;
-	has Supply $events;
+	has Supplier $events;
 	has Reporter::Console::Session @!active;
 	has Int $!tests;
 	has Int $!fails;
@@ -582,7 +582,7 @@ class Reporter::Console does Reporter {
 	submethod BUILD(:@names, IO::Handle :$handle = $*OUT, :$volume = Normal, :$timer = False, Bool :$ignore-exit = False) {
 		$!formatter = Formatter::Console.new(:@names, :$volume, :$timer, :$ignore-exit);
 		$!lastlength = 0;
-		$!events = Supply.new;
+		$!events = Supplier.new;
 		@!active .= new;
 
 		my $now = 0;
@@ -620,7 +620,7 @@ class Reporter::Console does Reporter {
 			$handle.print($!formatter.format-summary($aggregator, $interrupted, $duration));
 		}
 
-		$!events.act(-> @args { receive(|@args) });
+		$!events.Supply.act(-> @args { receive(|@args) });
 	}
 
 	method update(Str $name, Str $header, Int $number, Int $plan) {
@@ -795,25 +795,31 @@ package Runner {
 		has Supply $.supply;
 	}
 	class Source::Through does Source does TAP::Entry::Handler {
-		has Promise $.done = Promise.new;
 		has TAP::Entry @!entries;
-		has Supply $!input = Supply.new;
-		has Supply $!supply = Supply.new;
+		has Supplier $!input = Supplier.new;
+		has Supply $!output = $!input.Supply;
 		has Promise $.promise = $!input.Promise;
+		has Bool $!done = False;
 		method staple(TAP::Entry::Handler @handlers) {
 			for @!entries -> $entry {
 				@handlers».handle-entry($entry);
 			}
-			$!input.act({
-				@handlers».handle-entry($^entry);
-				@!entries.push($^entry);
-			}, :done({ @handlers».end-entries() }));
+			if $!done {
+				@handlers».end-entries;
+			}
+			else {
+				$!output.act({
+					@handlers».handle-entry($^entry);
+				}, :done({ @handlers».end-entries() }));
+			}
 		}
 		method handle-entry(TAP::Entry $entry) {
 			$!input.emit($entry);
+			@!entries.push($entry);
 		}
 		method end-entries() {
 			$!input.done();
+			$!done = True;
 		}
 	}
 
@@ -1029,7 +1035,7 @@ class Harness {
 	method make-source(Str $name) {
 		return @!handlers.max(*.can-handle($name)).make-source($name, :$!err);
 	}
-	my &sigint = do try { EVAL 'sub { signal(SIGINT) }' } or sub { Supply.new };
+	my &sigint = do try { EVAL 'sub { signal(SIGINT) }' } or sub { state $s = Supplier.new; return $s.Supply };
 
 	method run(*@sources) {
 		my $killed = Promise.new;
