@@ -1052,8 +1052,10 @@ package TAP {
 							await Promise.anyof(@working»<done>, $killed);
 							reap-finished();
 						}
-						await Promise.anyof(Promise.allof(@working»<done>), $killed) if @working;
-						reap-finished();
+						while @working {
+							await Promise.anyof(@working»<done>, $killed);
+							reap-finished();
+						}
 						CATCH {
 							when "Interrupted" {
 								reap-finished();
