@@ -534,7 +534,7 @@ class Reporter::Text does Reporter {
 }
 
 class Formatter::Console is Formatter::Text {
-	my &colored = try { EVAL q{ use Terminal::ANSIColor; &colored } } // sub ($text, $) { $text }
+	my &colored = sub ($text, $) { $text }
 	method format-success(Str $output) {
 		return colored($output, 'green');
 	}
@@ -1035,7 +1035,7 @@ class Harness {
 	method make-source(Str $name) {
 		return @!handlers.max(*.can-handle($name)).make-source($name, :$!err);
 	}
-	my &sigint = do try { EVAL 'sub { signal(SIGINT) }' } or sub { state $s = Supplier.new; return $s.Supply };
+	my &sigint = sub { signal(SIGINT) }
 
 	method run(*@sources) {
 		my $killed = Promise.new;
