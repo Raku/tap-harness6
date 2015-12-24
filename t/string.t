@@ -102,7 +102,6 @@ sub parse-and-get($content, :$tests-planned, :$tests-run, :$passed, :$failed, :$
 }
 
 sub lex-and-get($content) {
-	my $output = Supply.new;
 	my $ret = TAP::Collector.new;
 	my $lexer = TAP::Parser.new(:handlers[$ret]);
 	$lexer.add-data($content);

@@ -68,6 +68,7 @@ module Test::More {
 	sub cmp-ok(Mu $got, Any $op, Mu $expected, TAP::Test::Description $description = Str) is export {
 		$got.defined; # Hack to deal with Failures
 		my $ok;
+		use MONKEY-SEE-NO-EVAL;
 		if $op ~~ Callable ?? $op !! try EVAL "&infix:<$op>" -> $matcher {
 			$ok = $matcher($got,$expected);
 			generator.test(:$ok, :$description, |test-args());

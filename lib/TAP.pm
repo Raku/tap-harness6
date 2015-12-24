@@ -798,13 +798,12 @@ package Runner {
 		has TAP::Entry @!entries;
 		has Supplier $!input = Supplier.new;
 		has Supply $!output = $!input.Supply;
-		has Promise $.promise = $!input.Promise;
-		has Bool $!done = False;
+		has Promise $.promise = Promise.new;
 		method staple(TAP::Entry::Handler @handlers) {
 			for @!entries -> $entry {
 				@handlers».handle-entry($entry);
 			}
-			if $!done {
+			if $!promise {
 				@handlers».end-entries;
 			}
 			else {
@@ -819,7 +818,7 @@ package Runner {
 		}
 		method end-entries() {
 			$!input.done();
-			$!done = True;
+			$!promise.keep;
 		}
 	}
 
