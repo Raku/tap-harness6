@@ -374,11 +374,6 @@ role Reporter {
 }
 
 role Session does Entry::Handler {
-	method close-test() { ... }
-}
-
-class TAP::Reporter::Text { ... }
-role Reporter::Text::Session does Session {
 	has TAP::Reporter $.reporter;
 	has Str $.name;
 	has Str $.header;
@@ -387,6 +382,9 @@ role Reporter::Text::Session does Session {
 	method close-test(TAP::Result $result) {
 		$!reporter.print-result(self, $result);
 	}
+}
+
+class Reporter::Text::Session does Session {
 	method handle-entry(TAP::Entry $) {
 	}
 }
@@ -459,7 +457,7 @@ class Formatter::Text does Formatter {
 	method format-return(Str $output) {
 		return $output;
 	}
-	method format-result(Reporter::Text::Session $session, TAP::Result $result) {
+	method format-result(Session $session, TAP::Result $result) {
 		my $output;
 		my $name = $session.header;
 		if ($result.skip-all) {
@@ -520,7 +518,7 @@ class Reporter::Text does Reporter {
 
 	method open-test(Str $name) {
 		my $header = $!formatter.format-name($name);
-		return Formatter::Text::Session.new(:$name, :$header, :formatter(self));
+		return Reporter::Text::Session.new(:$name, :$header, :reporter(self));
 	}
 	method summarize(TAP::Aggregator $aggregator, Bool $interrupted, Duration $duration) {
 		self!output($!formatter.format-summary($aggregator, $interrupted, $duration));
@@ -546,7 +544,7 @@ class Formatter::Console is Formatter::Text {
 	}
 }
 
-class Reporter::Console::Session does Reporter::Text::Session {
+class Reporter::Console::Session does Session {
 	has Int $!last-updated = 0;
 	has Int $.plan = Int;
 	has Int $.number = 0;
