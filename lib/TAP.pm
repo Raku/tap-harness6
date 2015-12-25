@@ -1007,7 +1007,8 @@ class Harness {
 	}
 
 	has SourceHandler @.handlers = SourceHandler::Perl6.new();
-	has TAP::Reporter:U $.reporter-class = TAP::Reporter::Console;
+	has IO::Handle $.output = $*OUT;
+	has TAP::Reporter:U $.reporter-class = $!output.t ?? TAP::Reporter::Console !! TAP::Reporter::Text;
 	has Int:D $.jobs = 1;
 	has Bool:D $.timer = False;
 	subset ErrValue where any(IO::Handle:D, Supply, 'stderr', 'ignore', 'merge');
