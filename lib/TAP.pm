@@ -2,29 +2,18 @@ use v6;
 
 unit package TAP;
 role Entry {
-	has Str $.raw;
-	method to-string { ... }
-	method Str {
-		return $.raw // $.to-string;
-	}
+	has Str:D $.raw is required handles <Str>;
 }
 class Version does Entry {
 	has Int:D $.version is required;
-	method to-string() {
-		return "TAP Version $!version";
-	}
 }
 class Plan does Entry {
 	has Int:D $.tests is required;
 	has Bool $.skip-all;
 	has Str $.explanation;
-	method to-string() {
-		return ('1..' ~ $!tests, ($!skip-all ?? ('#SKIP', $!explanation).grep(*.defined) !! () )).join(' ');
-	}
 }
 
 enum Directive <No-Directive Skip Todo>;
-subset Directive::Explanation of Str where { not .defined or m/ ^ \N* $ / };
 
 class Test does Entry {
 	has Bool:D $.ok is required;
@@ -36,13 +25,7 @@ class Test does Entry {
 	method is-ok() {
 		return $!ok || $!directive ~~ Todo;
 	}
-	method to-string() {
-		my @ret = ($!ok ?? 'ok' !! 'not ok'), $!number, '-', $!description;
-		@ret.push('#'~$!directive.uc, $!explanation) if $!directive;
-		return @ret.grep(*.defined).join(' ');
-	}
 }
-subset Test::Description of Str where { not .defined or m/ ^ \N* $ / };
 
 class Sub-Test is Test {
 	has @.entries;
@@ -65,34 +48,19 @@ class Sub-Test is Test {
 		}
 		return @errors;
 	}
-	method to-string() {
-		return (@!entries».to-string()».indent(4), callsame).join("\n");
-	}
 }
 
 class Bailout does Entry {
 	has Str $.explanation;
-	method to-string {
-		return ('Bail out!', $.explanation).grep(*.defined).join(' ');
-	}
 }
 class Comment does Entry {
 	has Str:D $.comment is required;
-	method to-string {
-		return "# $!comment";
-	}
 }
 class YAML does Entry {
 	has Str:D $.serialized is required;
 	has Any $.deserialized;
-	method to-string {
-		return "  ---\n" ~ $!serialized.indent(2) ~~ '  ...'
-	}
 }
 class Unknown does Entry {
-	method to-string {
-		$!raw // fail 'Can\'t stringify empty Unknown';
-	}
 }
 
 role Entry::Handler {
@@ -100,47 +68,11 @@ role Entry::Handler {
 	method end-entries() { }
 }
 
-class Output does Entry::Handler {
-	has IO::Handle $.handle = $*OUT;
-	method handle-entry(Entry $entry) {
-		$!handle.say(~$entry);
-	}
-	method end-entries() {
-		$!handle.flush;
-	}
-	method open(Str $filename) {
-		my $handle = open $filename, :w;
-		$handle.autoflush(True);
-		return Output.new(:$handle);
-	}
-}
-
-class Entry::Handler::Multi does Entry::Handler {
-	has @!handlers;
-	submethod BUILD(:@handlers) {
-		@!handlers = @handlers;
-	}
-	method handle-entry(Entry $entry) {
-		for @!handlers -> $handler {
-			$handler.handle-entry($entry);
-		}
-	}
-	method end-entries() {
-		for @!handlers -> $handler {
-			$handler.end-entries();
-		}
-	}
-	method add-handler(Entry::Handler $handler) {
-		@!handlers.push($handler);
-	}
-}
-
 class Collector does Entry::Handler {
 	has @.entries;
-	submethod BUILD() {
-	}
+	submethod BUILD() { }
 	method handle-entry(Entry $entry) {
-		@!entries.push($entry);
+		 @!entries.push($entry);
 	}
 }
 
@@ -762,11 +694,11 @@ package Runner {
 		}
 	}
 	my class Run {
-		subset Killable of Any where { not .defined or .can('kill') };
+		subset Killable of Any where { .can('kill') };
 		has Promise:D $.process is required;
 		has Killable $!killer;
 		has Promise $!timer;
-		submethod BUILD(Promise :$!process, Killable :$!killer, Promise :$!timer) {
+		submethod BUILD(Promise :$!process, Killable :$!killer = Killable, Promise :$!timer) {
 		}
 		method kill() {
 			$!killer.kill if $!process;
