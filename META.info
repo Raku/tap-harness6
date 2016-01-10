@@ -6,6 +6,7 @@
 		"Test::More"                         : "lib/Test/More.pm6",
 		"Test::Stream"                       : "lib/Test/Stream.pm6",
 		"Test::Event"                        : "lib/Test/Event.pm6",
+		"Test::Generator"                    : "lib/Test/Generator.pm6",
 		"TAP"                                : "lib/TAP.pm",
 		"TAP::Entry"                         : "lib/TAP.pm",
 		"TAP::Entry::Version"                : "lib/TAP.pm",
