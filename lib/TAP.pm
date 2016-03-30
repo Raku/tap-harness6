@@ -30,7 +30,7 @@ class Test does Entry {
 class Sub-Test is Test {
 	has @.entries;
 
-	method inconsistencies(Str $usable-number = ~$.number // '?') {
+	method inconsistencies(Str $usable-number = ~($.number // '?')) {
 		my @errors;
 		my @tests = @!entries.grep(Test);
 		if $.ok != ?all(@tests).is-ok {
@@ -191,9 +191,9 @@ grammar Grammar {
 		'#' <.sp>* $<comment>=[\N*]
 	}
 	token yaml(Int $indent = 0) {
-		$<yaml-indent>=['  '] '---' \n
-		[ ^^ <.indent($indent)> $<yaml-indent> $<yaml-line>=[<!before '...'> \N* \n] ]*
-		<.indent($indent)> $<yaml-indent> '...'
+		'  ---' \n
+		[ ^^ <.indent($indent)> '  ' $<yaml-line>=[<!before '...'> \N* \n] ]*
+		<.indent($indent)> '  ...'
 	}
 	token sub-entry(Int $indent) {
 		<plan> | <test> | <comment> | <yaml($indent)> | <sub-test($indent)> || <!before <.sp> > <unknown>
