@@ -478,7 +478,7 @@ class Formatter::Console is Formatter::Text {
 class Reporter::Console::Session does Session {
 	has Int $!last-updated = 0;
 	has Int $.plan = Int;
-	has Int $.number = 0;
+	has Int:D $.number = 0;
 	proto method handle-entry(TAP::Entry $entry) {
 		{*};
 	}
@@ -499,6 +499,9 @@ class Reporter::Console::Session does Session {
 	}
 	multi method handle-entry(TAP::Entry $) {
 	}
+	method summary() {
+		return ($!number, $!plan // '?').join("/");
+	}
 }
 class Reporter::Console does Reporter {
 	has Formatter::Console $!formatter;
@@ -513,6 +516,7 @@ class Reporter::Console does Reporter {
 		$!lastlength = 0;
 		$!events = Supplier.new;
 		@!active .= new;
+		$!tests = 0;
 
 		my $now = 0;
 		my $start = now;
@@ -523,7 +527,7 @@ class Reporter::Console does Reporter {
 			$now = $new-now;
 			return if $!formatter.volume < Quiet;
 			my $header = sprintf '===( %7d;%d', $!tests, $now - $start;
-			my @items = @!active.map(-> $active { sprintf '%' ~ $active.plan.chars ~ "d/%d", $active.number, $active.plan });
+			my @items = @!active.map(*.summary);
 			my $ruler = ($header, |@items).join('  ') ~ ')===';
 			$handle.print($!formatter.format-return($ruler));
 		}
