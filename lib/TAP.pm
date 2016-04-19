@@ -775,10 +775,10 @@ package Runner {
 				}
 				when 'merge' {
 					warn "Merging isn't supported yet on Asynchronous streams";
-					$async.stderr({});
+					$async.stderr;
 				}
 				when 'ignore' {
-					$async.stderr({});
+					$async.stderr;
 				}
 				when IO::Handle:D {
 					$async.stderr.lines.act({ $err.say($_) });
