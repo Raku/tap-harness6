@@ -973,7 +973,7 @@ class Harness {
 	method run(*@sources) {
 		my $killed = Promise.new;
 		my $aggregator = self.make-aggregator;
-		my $reporter = $!reporter-class.new(:names(@sources), :$!timer, :$!ignore-exit);
+		my $reporter = $!reporter-class.new(:names(@sources), :$!timer, :$!ignore-exit, :handle($!output));
 
 		if $!jobs > 1 {
 			my @working;
