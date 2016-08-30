@@ -492,6 +492,7 @@ class Reporter::Console::Session does Session {
     multi method handle-entry(TAP::Test $test) {
         my $now = time;
         ++$!number;
+        $!reporter.tick;
         if $!last-updated != $now {
             $!last-updated = $now;
             $!reporter.update($.name, $!header, $test.number // $!number, $!plan);
@@ -568,6 +569,9 @@ class Reporter::Console does Reporter {
     }
     method summarize(TAP::Aggregator $aggregator, Bool $interrupted, Duration $duration) {
         $!events.emit(['summary', $aggregator, $interrupted, $duration]);
+    }
+    method tick() {
+        $!tests++;
     }
 
     method open-test(Str $name) {
