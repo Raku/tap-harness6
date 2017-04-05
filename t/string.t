@@ -1,4 +1,8 @@
 use TAP;
+
+print "1..0 # SKIP subtests and YAML have been disabled for now\n";
+exit 0;
+
 use Test;
 
 my $content1 = q:heredoc/END/;
