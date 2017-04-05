@@ -167,7 +167,7 @@ grammar Grammar {
     token sp { <[\s] - [\n]> }
     token num { <[0..9]>+ }
     token line {
-        ^^ [ <plan> | <test> | <bailout> | <version> | <comment> | <yaml> | <sub-test> || <unknown> ] \n
+        ^^ [ <plan> | <test> | <bailout> | <version> | <comment> || <unknown> ] \n
     }
     token plan {
         '1..' <count=.num> <.sp>* [
