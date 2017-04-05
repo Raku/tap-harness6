@@ -38,5 +38,5 @@
     },
     "author" : "Leon Timmermans",
     "depends" : [ ],
-    "source-url" : "git://github.com/leont/tap-harness6.git"
+    "source-url" : "git://github.com/perl6/tap-harness6.git"
 }
