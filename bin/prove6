@@ -46,7 +46,7 @@ multi sub MAIN(
 	@sources = $shuffle ?? @sources.pick(*) !! @sources.sort;
 	@sources = @sources.reverse if $reverse;
 	my $run = $harness-class.new(:$jobs, :$timer, :$ignore-exit, :$err, |%more).run(@sources);
-	exit min($run.result.failed, 254);
+	exit min($run.result.failed + $run.result.errors, 254);
 }
 
 multi sub MAIN(Bool :$help!) {
