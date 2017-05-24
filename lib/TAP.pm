@@ -131,7 +131,7 @@ class Aggregator {
     has Int $.todo = 0;
     has Int $.todo-passed = 0;
     has Int $.skipped = 0;
-    has Bool $.exit-failed = False;
+    has Int $.exit-failed = 0;
     has Bool $.ignore-exit = False;
 
     method add-result(Result $result) {
@@ -150,7 +150,7 @@ class Aggregator {
         $!todo-passed += $result.todo-passed.elems;
         $!skipped += $result.skipped.elems;
         $!errors += $result.errors.elems;
-        $!exit-failed = True if not $!ignore-exit and $result.wait;
+        $!exit-failed++ if not $!ignore-exit and $result.wait;
     }
 
     method result-count {
@@ -165,7 +165,7 @@ class Aggregator {
         $!todo-passed || self.has-errors;
     }
     method has-errors() {
-        $!failed || $!errors || $!exit-failed;
+        $!failed + $!errors + $!exit-failed;
     }
     method get-status() {
         self.has-errors || $!tests-run != $!passed ?? 'FAILED' !! $!tests-run ?? 'PASS' !! 'NOTESTS';
