@@ -68,6 +68,16 @@ role Entry::Handler {
     method end-entries() { }
 }
 
+class Output does Entry::Handler {
+    has IO::Handle $.handle = $*OUT;
+    method handle-entry(Entry $entry) {
+        $!handle.say(~$entry);
+    }
+    method end-entries() {
+        $!handle.flush;
+    }
+}
+
 class Collector does Entry::Handler {
     has @.entries;
     submethod BUILD() { }
@@ -947,8 +957,9 @@ class Harness {
     }
 
     has SourceHandler @.handlers = SourceHandler::Perl6.new();
-    has IO::Handle $.output = $*OUT;
-    has TAP::Reporter:U $.reporter-class = $!output.t ?? TAP::Reporter::Console !! TAP::Reporter::Text;
+    has IO::Handle $.handle = $*OUT;
+    has Formatter::Volume $.volume = Normal;
+    has TAP::Reporter:U $.reporter-class = $!handle.t && $!volume < Verbose ?? TAP::Reporter::Console !! TAP::Reporter::Text;
     has Int:D $.jobs = 1;
     has Bool:D $.timer = False;
     subset ErrValue where any(IO::Handle:D, Supply, 'stderr', 'ignore', 'merge');
@@ -970,7 +981,7 @@ class Harness {
         TAP::Aggregator.new(:$!ignore-exit);
     }
     method make-handlers(Str $name) {
-        ();
+        $.volume == Verbose ?? TAP::Output.new(:$!handle) !! ()
     }
     method make-source(Str $name) {
         @!handlers.max(*.can-handle($name)).make-source($name, :$!err);
@@ -980,7 +991,7 @@ class Harness {
     method run(*@sources) {
         my $killed = Promise.new;
         my $aggregator = self.make-aggregator;
-        my $reporter = $!reporter-class.new(:names(@sources), :$!timer, :$!ignore-exit);
+        my $reporter = $!reporter-class.new(:names(@sources), :$!timer, :$!ignore-exit, :$!volume, :$!handle);
 
         if $!jobs > 1 {
             my @working;

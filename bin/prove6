@@ -19,7 +19,7 @@ sub load(Str $classname) {
 
 multi sub MAIN(
 	Bool :l($lib), Bool :b($blib), Bool :$timer = False, Int :j($jobs) = 1,
-	Bool :$ignore-exit = False, Bool :$trap = False,
+	Bool :$ignore-exit = False, Bool :$trap = False, Bool :v($verbose) = False,
 	Bool :$shuffle = False, Str :$err = 'stderr', Bool :$reverse = False,
 	Str :e($exec), Str :$harness, Str :$reporter, Str :I($incdir),
 	*@files) {
@@ -41,6 +41,7 @@ multi sub MAIN(
 	with $reporter {
 		%more<reporter-class> = load($reporter);
 	}
+	%more<volume> = TAP::Verbose if $verbose;
 	my @sources = @files.map(*.IO).flatmap(&listall);
 	@sources = $shuffle ?? @sources.pick(*) !! @sources.sort;
 	@sources = @sources.reverse if $reverse;
