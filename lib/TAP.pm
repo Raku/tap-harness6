@@ -173,12 +173,11 @@ class Aggregator {
 }
 
 grammar Grammar {
-    token TOP { ^ <line>+ $ }
+    token TOP {
+        ^ [ <plan> | <test> | <bailout> | <version> | <comment> || <unknown> ] $
+    }
     token sp { <[\s] - [\n]> }
     token num { <[0..9]>+ }
-    token line {
-        ^^ [ <plan> | <test> | <bailout> | <version> | <comment> || <unknown> ] \n
-    }
     token plan {
         '1..' <count=.num> <.sp>* [
             '#' <.sp>* $<directive>=[:i 'SKIP'] \S*
@@ -227,9 +226,6 @@ grammar Grammar {
     }
     class Actions {
         method TOP($/) {
-            make @<line>».made;
-        }
-        method line($/) {
             make $/.values[0].made;
         }
         method plan($/) {
@@ -292,9 +288,9 @@ class Parser {
     has TAP::Entry::Handler @!handlers;
     has Grammar $!grammar = Grammar.new;
     submethod BUILD(Supply :$!input, :@!handlers, Callable :$when-done) {
-        my $lines = $!input.lines(:!chomp);
+        my $lines = $!input.lines;
         $lines.act(-> $line {
-                my $match = $!grammar.parse($line, :rule('line'));
+                my $match = $!grammar.parse($line);
                 @!handlers».handle-entry($match.made);
             },
             done => {
