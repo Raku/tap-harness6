@@ -288,29 +288,20 @@ grammar Grammar {
 }
 
 class Parser {
-    has Str $!buffer = '';
     has Supply $!input is required;
     has TAP::Entry::Handler @!handlers;
     has Grammar $!grammar = Grammar.new;
     submethod BUILD(Supply :$!input, :@!handlers, Callable :$when-done) {
-        $!input.act(-> $data {
-                $!buffer ~= $data;
-                while ($!grammar.subparse($!buffer, :rule('line'))) -> $match {
-                    $!buffer.=substr($match.to);
-                    @!handlers».handle-entry($match.made);
-                }
+        my $lines = $!input.lines(:!chomp);
+        $lines.act(-> $line {
+                my $match = $!grammar.parse($line, :rule('line'));
+                @!handlers».handle-entry($match.made);
             },
             done => {
-                if $!buffer.chars {
-                    warn "Unparsed data left at end of stream: $!buffer";
-                }
                 @!handlers».end-entries();
                 $when-done() when $when-done;
             },
             quit => {
-                if $!buffer.chars {
-                    warn "Unparsed data left at end of stream: $!buffer";
-                }
                 @!handlers».end-entries();
                 $when-done() when $when-done;
             }
