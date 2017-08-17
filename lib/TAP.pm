@@ -289,23 +289,34 @@ grammar Grammar {
 
 class Parser {
     has Str $!buffer = '';
+    has Supply $!input is required;
     has TAP::Entry::Handler @!handlers;
     has Grammar $!grammar = Grammar.new;
-    submethod BUILD(:@!handlers) { }
-    method add-data(Str $data) {
-        $!buffer ~= $data;
-        while ($!grammar.subparse($!buffer)) -> $match {
-            $!buffer.=substr($match.to);
-            for @($match.made) -> $result {
-                @!handlers».handle-entry($result);
+    submethod BUILD(Supply :$!input, :@!handlers, Callable :$when-done) {
+        $!input.act(-> $data {
+                $!buffer ~= $data;
+                while ($!grammar.subparse($!buffer)) -> $match {
+                    $!buffer.=substr($match.to);
+                    for @($match.made) -> $result {
+                        @!handlers».handle-entry($result);
+                    }
+                }
+            },
+            done => {
+                if $!buffer.chars {
+                    warn "Unparsed data left at end of stream: $!buffer";
+                }
+                @!handlers».end-entries();
+                $when-done() when $when-done;
+            },
+            quit => {
+                if $!buffer.chars {
+                    warn "Unparsed data left at end of stream: $!buffer";
+                }
+                @!handlers».end-entries();
+                $when-done() when $when-done;
             }
-        }
-    }
-    method close-data() {
-        if $!buffer.chars {
-            warn "Unparsed data left at end of stream: $!buffer";
-        }
-        @!handlers».end-entries();
+        );
     }
 }
 
@@ -784,8 +795,7 @@ package Runner {
 
         multi get_runner(Source::Proc $proc; TAP::Entry::Handler @handlers) {
             my $async = Proc::Async.new($proc.path, $proc.args);
-            my $parser = TAP::Parser.new(:@handlers);
-            $async.stdout().act({ $parser.add-data($^data) }, :done({ $parser.close-data() }));
+            my $parser = TAP::Parser.new(:input($async.stdout), :@handlers);
             given $proc.err {
                 my $err = $_;
                 when 'stderr' { #default is correct
@@ -813,11 +823,10 @@ package Runner {
             Run.new(:$process, :killer($async), :$timer);
         }
         multi get_runner(Source::Supply $supply; TAP::Entry::Handler @handlers) {
-            my $parser = TAP::Parser.new(:@handlers);
             my $start-time = now;
             my $process = Promise.new;
             my $timer = $process.then({ now - $start-time });
-            $supply.supply.act({ $parser.add-data($^data) }, :done({ $parser.close-data(); $process.keep }));
+            my $parser = TAP::Parser.new(:input($supply.supply), :when-done({ $process.keep }) , :@handlers);
             Run.new(:$process, :$timer);
         }
         multi get_runner(Source::Through $through; TAP::Entry::Handler @handlers) {
@@ -825,16 +834,16 @@ package Runner {
             Run.new(:process($through.promise));
         }
         multi get_runner(Source::File $file; TAP::Entry::Handler @handlers) {
-            my $parser = TAP::Parser.new(:@handlers);
+            my $supplier = Supplier.new;
+            my $parser = TAP::Parser.new(:input($supplier.Supply), :@handlers);
             Run.new(:process(start {
-                $parser.add-data($file.filename.IO.slurp);
-                $parser.close-data();
+                $supplier.emit($file.filename.IO.slurp);
+                $supplier.done();
             }));
         }
         multi get_runner(Source::String $string; TAP::Entry::Handler @handlers) {
-            my $parser = TAP::Parser.new(:@handlers);
-            $parser.add-data($string.content);
-            $parser.close-data();
+            my $input = supply { emit $string.content; done }
+            my $parser = TAP::Parser.new(:$input, :@handlers);
             my $done = Promise.new;
             $done.keep;
             Run.new(:process($done));
@@ -891,17 +900,13 @@ package Runner {
                             die "Unknown error handler { $!source.err }";
                         }
                     }
-                    my $parser = TAP::Parser.new(:@handlers);
-                    for $proc.out.lines(:close) -> $line {
-                        $parser.add-data($line);
-                    }
-                    $parser.close-data();
+                    my $input = $proc.out.lines.Supply;
+                    my $parser = TAP::Parser.new(:$input, :@handlers);
                     return $state.finalize($!name, $proc, now - $start-time);
                 }
                 when Source::Supply {
-                    my $parser = TAP::Parser.new(:@handlers);
+                    my $parser = TAP::Parser.new(:input($!source.supply), :@handlers);
                     my $start-time = now;
-                    $!source.supply.act({ $parser.add-data($^data) }, :done({ $parser.close-data() }));
                     await $!source.supply;
                     return $state.finalize($!name, Proc, now - $start-time);
                 }
@@ -911,15 +916,13 @@ package Runner {
                     return $state.finalize($!name, Proc, now - $start-time);
                 }
                 when Source::File {
-                    my $parser = TAP::Parser.new(:@handlers);
-                    $parser.add-data($!source.filename.IO.slurp);
-                    $parser.close-data();
+                    my $input = supply { emit $!source.filename.IO.slurp };
+                    my $parser = TAP::Parser.new(:$input, :@handlers);
                     return $state.finalize($!name, Proc, now - $start-time);
                 }
                 when Source::String {
-                    my $parser = TAP::Parser.new(:@handlers);
-                    $parser.add-data($!source.content);
-                    $parser.close-data();
+                    my $input = supply { emit $!source.content };
+                    my $parser = TAP::Parser.new(:$input, :@handlers);
                     return $state.finalize($!name, Proc, now - $start-time);
                 }
             }
