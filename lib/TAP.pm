@@ -295,11 +295,9 @@ class Parser {
     submethod BUILD(Supply :$!input, :@!handlers, Callable :$when-done) {
         $!input.act(-> $data {
                 $!buffer ~= $data;
-                while ($!grammar.subparse($!buffer)) -> $match {
+                while ($!grammar.subparse($!buffer, :rule('line'))) -> $match {
                     $!buffer.=substr($match.to);
-                    for @($match.made) -> $result {
-                        @!handlers».handle-entry($result);
-                    }
+                    @!handlers».handle-entry($match.made);
                 }
             },
             done => {
