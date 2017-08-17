@@ -288,10 +288,79 @@ class Parser {
     has TAP::Entry::Handler @!handlers;
     has Grammar $!grammar = Grammar.new;
     submethod BUILD(Supply :$!input, :@!handlers, Callable :$when-done) {
+        enum Mode <Normal SubTest Yaml >;
+        my Mode $mode = Normal;
+        my Str @buffer;
+        sub set-state(Mode $new, Str $line) {
+            $mode = $new;
+            @buffer = $line;
+        }
+        sub emit-unknown(*@more) {
+            @buffer.append: @more;
+            for @buffer -> $raw {
+                emit Unknown.new(:$raw);
+            }
+            @buffer = ();
+            $mode = Normal;
+        }
+        sub emit-reset(Match $entry) {
+            emit $entry.made;
+            @buffer = ();
+            $mode = Normal;
+        }
+
+        my token indented { ^ '    ' }
+
         my $output = supply {
             whenever $!input.lines -> $line {
-                emit $!grammar.parse($line).made;
+                if $mode == Normal {
+                    if $line ~~ / ^ '  ---' / {
+                        set-state(Yaml, $line);
+                    }
+                    elsif $line ~~ &indented {
+                        set-state(SubTest, $line);
+                    }
+                    else {
+                        emit-reset $!grammar.parse($line);
+                    }
+                }
+                elsif $mode == SubTest {
+                    if $line ~~ &indented {
+                        @buffer.push: $line;
+                    }
+                    elsif $!grammar.parse($line, :rule('test')) -> $test {
+                        my $raw = (|@buffer, $line).join("\n");
+                        if $!grammar.parse($raw, :rule('sub-test')) -> $subtest {
+                            emit-reset $subtest;
+                        }
+                        else {
+                            emit-unknown;
+                            emit-reset $test;
+                        }
+                    }
+                    else {
+                        emit-unknown $line;
+                    }
+                }
+                elsif $mode == Yaml {
+                    if $line ~~ / ^ '  '  $<content>=[\N*] $ / {
+                        @buffer.push: $line;
+                        if $<content> eq '...' {
+                            my $raw = @buffer.join("\n");
+                            if $!grammar.parse($raw, :rule('yaml')) -> $yaml {
+                                emit-reset $yaml;
+                            }
+                            else {
+                                emit-unknown;
+                            }
+                        }
+                    }
+                    else {
+                        emit-unknown $line;
+                    }
+                }
             }
+            LEAVE { emit-unknown }
         }
         $output.act(-> $entry {
                 @!handlers».handle-entry($entry);

@@ -1,8 +1,5 @@
 use TAP;
 
-print "1..0 # SKIP subtests and YAML have been disabled for now\n";
-exit 0;
-
 use Test;
 
 my $content1 = q:heredoc/END/;
@@ -65,6 +62,9 @@ ok 1 - a\#b
       ...
     1..1
 ok 2 - c
+  ---
+  - Baz
+  ...
 END
 
 parse-and-get($content5, :tests-planned(2), :tests-run(2), :passed(2), :failed(0), :todo-passed(0), :skipped(0), :unknowns(0), :errors());
@@ -79,6 +79,7 @@ isa-ok(@entries2[2].entries[1], TAP::YAML, 'Got YAML');
 if try (require YAMLish) {
 	is-deeply(@entries2[2].entries[1].deserialized, [ <Foo Bar> ], 'Could deserialize YAML');
 }
+isa-ok(@entries2[3], TAP::YAML, 'Got YAML again');
 
 done-testing();
 
@@ -102,8 +103,7 @@ sub parse-and-get($content, :$tests-planned, :$tests-run, :$passed, :$failed, :$
 
 sub lex-and-get($content) {
 	my $ret = TAP::Collector.new;
-	my $lexer = TAP::Parser.new(:handlers[$ret]);
-	$lexer.add-data($content);
-	$lexer.close-data();
+	my $input = supply { emit $content };
+	my $lexer = TAP::Parser.new(:$input, :handlers[$ret]);
 	return $ret.entries;
 }
