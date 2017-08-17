@@ -288,10 +288,13 @@ class Parser {
     has TAP::Entry::Handler @!handlers;
     has Grammar $!grammar = Grammar.new;
     submethod BUILD(Supply :$!input, :@!handlers, Callable :$when-done) {
-        my $lines = $!input.lines;
-        $lines.act(-> $line {
-                my $match = $!grammar.parse($line);
-                @!handlers».handle-entry($match.made);
+        my $output = supply {
+            whenever $!input.lines -> $line {
+                emit $!grammar.parse($line).made;
+            }
+        }
+        $output.act(-> $entry {
+                @!handlers».handle-entry($entry);
             },
             done => {
                 @!handlers».end-entries();
