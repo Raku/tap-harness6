@@ -63,7 +63,7 @@ class YAML does Entry {
 class Unknown does Entry {
 }
 
-role Entry::Handler {
+my role Entry::Handler {
     method handle-entry(Entry) { ... }
     method end-entries() { }
     method listen(Supply $supply) {
@@ -166,7 +166,7 @@ class Aggregator {
     }
 }
 
-grammar Grammar {
+my grammar Grammar {
     token TOP {
         ^ [ <plan> | <test> | <bailout> | <version> | <comment> || <unknown> ] $
     }
