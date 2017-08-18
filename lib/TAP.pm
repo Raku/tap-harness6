@@ -886,66 +886,6 @@ package Runner {
             $!result //= $!state.finalize($!name, $!run.exit-status, $!run.time);
         }
     }
-
-    class Sync {
-        has Source $.source;
-        has @.handlers;
-        has Str $.name = $!source.name;
-
-        method run(Promise :$bailout) {
-            my $state = State.new(:$bailout);
-            my TAP::Entry::Handler @handlers = $state, |@!handlers;
-            my $start-time = now;
-            given $!source {
-                when Source::Proc {
-                    my $proc = do given $!source.err {
-                        when 'merge' {
-                            run($!source.path, $!source.args, :out, :!chomp, :merge);
-                        }
-                        when 'stderr' {
-                            run($!source.path, $!source.args, :out, :!chomp);
-                        }
-                        when 'ignore' {
-                            run($!source.path, $!source.args, :out, :!chomp, :!err);
-                        }
-                        when Supply:D {
-                            my $tmp = run($!source.path, $!source.args, :out, :!chomp, :err);
-                            start {
-                                $!source.err.emit($_) for $tmp.err.lines(:close);
-                                $!source.err.done;
-                            }
-                            $tmp;
-                        }
-                        when IO::Handle:D {
-                            run($!source.path, $!source.args, :out, :!chomp, :err($!source.err));
-                        }
-                        default {
-                            die "Unknown error handler { $!source.err }";
-                        }
-                    }
-                    my $input = $proc.out.lines.Supply;
-                    my $parser = TAP::Parser.new(:$input, :@handlers);
-                    return $state.finalize($!name, $proc, now - $start-time);
-                }
-                when Source::Supply {
-                    my $parser = TAP::Parser.new(:input($!source.supply), :@handlers);
-                    my $start-time = now;
-                    await $!source.supply;
-                    return $state.finalize($!name, Proc, now - $start-time);
-                }
-                when Source::File {
-                    my $input = supply { emit $!source.filename.IO.slurp };
-                    my $parser = TAP::Parser.new(:$input, :@handlers);
-                    return $state.finalize($!name, Proc, now - $start-time);
-                }
-                when Source::String {
-                    my $input = supply { emit $!source.content };
-                    my $parser = TAP::Parser.new(:$input, :@handlers);
-                    return $state.finalize($!name, Proc, now - $start-time);
-                }
-            }
-        }
-    }
 }
 
 class Harness {
@@ -1014,73 +954,49 @@ class Harness {
         my $aggregator = self.make-aggregator;
         my $reporter = $!reporter-class.new(:names(@sources), :$!timer, :$!ignore-exit, :$!volume, :$!handle);
 
-        if $!jobs > 1 {
-            my @working;
-            my $waiter = start {
-                my $int = $!trap ?? sigint().tap({ $killed.break("Interrupted"); $int.close(); }) !! Tap;
-                my $begin = now;
-                try {
-                    for @sources -> $name {
-                        my $session = $reporter.open-test($name);
-                        my @handlers = $session, |self.make-handlers($name);
-                        my $source = self.make-source($name);
-                        my $parser = TAP::Runner::Async.new(:$source, :@handlers, :$killed);
-                        @working.push({ :$parser, :$session, :done($parser.waiter) });
-                        next if @working < $!jobs;
-                        await Promise.anyof(@working»<done>, $killed);
+        my @working;
+        my $waiter = start {
+            my $int = $!trap ?? sigint().tap({ $killed.break("Interrupted"); $int.close(); }) !! Tap;
+            my $begin = now;
+            try {
+                for @sources -> $name {
+                    my $session = $reporter.open-test($name);
+                    my @handlers = $session, |self.make-handlers($name);
+                    my $source = self.make-source($name);
+                    my $parser = TAP::Runner::Async.new(:$source, :@handlers, :$killed);
+                    @working.push({ :$parser, :$session, :done($parser.waiter) });
+                    next if @working < $!jobs;
+                    await Promise.anyof(@working»<done>, $killed);
+                    reap-finished();
+                }
+                while @working {
+                    await Promise.anyof(@working»<done>, $killed);
+                    reap-finished();
+                }
+                CATCH {
+                    when "Interrupted" {
                         reap-finished();
-                    }
-                    while @working {
-                        await Promise.anyof(@working»<done>, $killed);
-                        reap-finished();
-                    }
-                    CATCH {
-                        when "Interrupted" {
-                            reap-finished();
-                            @working».<parser>».kill;
-                        }
+                        @working».<parser>».kill;
                     }
                 }
-                $reporter.summarize($aggregator, ?$killed, now - $begin) if !$killed || $!trap;
-                $int.close if $int;
-                $aggregator;
             }
-            sub reap-finished() {
-                my @new-working;
-                for @working -> $current {
-                    if $current<done> {
-                        $aggregator.add-result($current<parser>.result);
-                        $current<session>.close-test($current<parser>.result);
-                    }
-                    else {
-                        @new-working.push($current);
-                    }
-                }
-                @working = @new-working;
-            }
-            Run.new(:$waiter, :$killed);
+            $reporter.summarize($aggregator, ?$killed, now - $begin) if !$killed || $!trap;
+            $int.close if $int;
+            $aggregator;
         }
-        else {
-            my $waiter = start {
-                my $int = $!trap ?? sigint().tap({ $killed.break("Interrupted"); $int.close(); }) !! Tap;
-                my $begin = now;
-                try {
-                    for @sources -> $name {
-                        my $session = $reporter.open-test($name);
-                        my @handlers = $session, |self.make-handlers($name);
-                        my $source = self.make-source($name);
-                        my $result = TAP::Runner::Sync.new(:$source, :@handlers).run(:$killed);
-                        $aggregator.add-result($result);
-                        $session.close-test($result);
-                        $killed.result if $killed;
-                    }
-                    CATCH { when "Interrupted" { } }
+        sub reap-finished() {
+            my @new-working;
+            for @working -> $current {
+                if $current<done> {
+                    $aggregator.add-result($current<parser>.result);
+                    $current<session>.close-test($current<parser>.result);
                 }
-                $reporter.summarize($aggregator, ?$killed, now - $begin) if !$killed || $!trap;
-                $int.close if $int;
-                $aggregator;
+                else {
+                    @new-working.push($current);
+                }
             }
-            Run.new(:$waiter, :$killed);
+            @working = @new-working;
         }
+        Run.new(:$waiter, :$killed);
     }
 }
