@@ -66,6 +66,18 @@ class Unknown does Entry {
 role Entry::Handler {
     method handle-entry(Entry) { ... }
     method end-entries() { }
+    method listen(Supply $supply) {
+        $supply.act(-> $entry {
+                self.handle-entry($entry);
+            },
+            done => {
+                self.end-entries();
+            },
+            quit => {
+                self.end-entries();
+            }
+        );
+    }
 }
 
 class Output does Entry::Handler {
@@ -367,16 +379,7 @@ class Parser {
     submethod BUILD(Supply :$input, :@handlers, Callable :$when-done) {
         $!output = parser($input);
         for @handlers -> $handler {
-            $!output.act(-> $entry {
-                    $handler.handle-entry($entry);
-                },
-                done => {
-                    $handler.end-entries();
-                },
-                quit => {
-                    $handler.end-entries();
-                }
-            );
+            $handler.listen($!output);
         }
         when $when-done {
             $!output.act({}, :done($when-done), :quit($when-done));
