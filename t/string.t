@@ -102,8 +102,10 @@ sub parse-and-get($content, :$tests-planned, :$tests-run, :$passed, :$failed, :$
 }
 
 sub lex-and-get($content) {
-	my $ret = TAP::Collector.new;
-	my $input = supply { emit $content };
-	my $lexer = TAP::Parser.new(:$input, :handlers[$ret]);
-	return $ret.entries;
+	my $source = TAP::Runner::Source::String.new(:$content);
+	my $async = TAP::Runner::Async.new(:$source);
+	my @events;
+	$async.events.act({ @events.push: $^event });
+	await $async.waiter;
+	return @events;
 }

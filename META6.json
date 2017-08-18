@@ -22,7 +22,6 @@
 		"TAP::Aggregator"                    : "lib/TAP.pm",
 		"TAP::Grammar"                       : "lib/TAP.pm",
 		"TAP::Action"                        : "lib/TAP.pm",
-		"TAP::Parser"                        : "lib/TAP.pm",
 		"TAP::Formatter"                     : "lib/TAP.pm",
 		"TAP::Reporter"                      : "lib/TAP.pm",
 		"TAP::Reporter::Text"                : "lib/TAP.pm",

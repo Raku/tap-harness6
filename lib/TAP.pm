@@ -374,16 +374,6 @@ my sub parser(Supply $input --> Supply) {
     }
 }
 
-class Parser {
-    has Supply $.output;
-    submethod BUILD(Supply :$input, :@handlers) {
-        $!output = parser($input);
-        for @handlers -> $handler {
-            $handler.listen($!output);
-        }
-    }
-}
-
 enum Formatter::Volume <Silent ReallyQuiet Quiet Normal Verbose>;
 role Formatter {
     has Bool:D $.timer = False;
