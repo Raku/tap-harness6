@@ -822,33 +822,6 @@ package Runner {
     class Source::Supply does Source {
         has Supply $.supply;
     }
-    class Source::Through does Source does TAP::Entry::Handler {
-        has TAP::Entry @!entries;
-        has Supplier $!input = Supplier.new;
-        has Supply $!output = $!input.Supply;
-        has Promise $.promise = Promise.new;
-        method staple(TAP::Entry::Handler @handlers) {
-            for @!entries -> $entry {
-                @handlers».handle-entry($entry);
-            }
-            if $!promise {
-                @handlers».end-entries;
-            }
-            else {
-                $!output.act({
-                    @handlers».handle-entry($^entry);
-                }, :done({ @handlers».end-entries() }));
-            }
-        }
-        method handle-entry(TAP::Entry $entry) {
-            $!input.emit($entry);
-            @!entries.push($entry);
-        }
-        method end-entries() {
-            $!input.done();
-            $!promise.keep;
-        }
-    }
 
     class Async {
         has Str $.name;
@@ -895,10 +868,6 @@ package Runner {
             my $timer = $process.then({ now - $start-time });
             my $parser = TAP::Parser.new(:input($supply.supply), :when-done({ $process.keep }) , :@handlers);
             Run.new(:$process, :$timer);
-        }
-        multi get_runner(Source::Through $through; TAP::Entry::Handler @handlers) {
-            $through.staple(@handlers);
-            Run.new(:process($through.promise));
         }
         multi get_runner(Source::File $file; TAP::Entry::Handler @handlers) {
             my $supplier = Supplier.new;
@@ -975,11 +944,6 @@ package Runner {
                     my $parser = TAP::Parser.new(:input($!source.supply), :@handlers);
                     my $start-time = now;
                     await $!source.supply;
-                    return $state.finalize($!name, Proc, now - $start-time);
-                }
-                when Source::Through {
-                    $!source.staple(@handlers);
-                    $!source.promise.result;
                     return $state.finalize($!name, Proc, now - $start-time);
                 }
                 when Source::File {

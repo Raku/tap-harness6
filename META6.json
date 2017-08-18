@@ -30,7 +30,6 @@
 		"TAP::Runner::Source::Proc"          : "lib/TAP.pm",
 		"TAP::Runner::Source::File"          : "lib/TAP.pm",
 		"TAP::Runner::Source::String"        : "lib/TAP.pm",
-		"TAP::Runner::Source::Through"       : "lib/TAP.pm",
 		"TAP::Runner::Async"                 : "lib/TAP.pm",
 		"TAP::Runner::Sync"                  : "lib/TAP.pm",
 		"TAP::Harness"                       : "lib/TAP.pm",
