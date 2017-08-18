@@ -283,11 +283,8 @@ grammar Grammar {
     }
 }
 
-class Parser {
-    has Supply $!input is required;
-    has TAP::Entry::Handler @!handlers;
-    has Grammar $!grammar = Grammar.new;
-    submethod BUILD(Supply :$!input, :@!handlers, Callable :$when-done) {
+my sub parser(Supply $input --> Supply) {
+    supply {
         enum Mode <Normal SubTest Yaml >;
         my Mode $mode = Normal;
         my Str @buffer;
@@ -311,69 +308,79 @@ class Parser {
 
         my token indented { ^ '    ' }
 
-        my $output = supply {
-            whenever $!input.lines -> $line {
-                if $mode == Normal {
-                    if $line ~~ / ^ '  ---' / {
-                        set-state(Yaml, $line);
-                    }
-                    elsif $line ~~ &indented {
-                        set-state(SubTest, $line);
+        my $grammar = Grammar.new;
+
+        whenever $input.lines -> $line {
+            if $mode == Normal {
+                if $line ~~ / ^ '  ---' / {
+                    set-state(Yaml, $line);
+                }
+                elsif $line ~~ &indented {
+                    set-state(SubTest, $line);
+                }
+                else {
+                    emit-reset $grammar.parse($line);
+                }
+            }
+            elsif $mode == SubTest {
+                if $line ~~ &indented {
+                    @buffer.push: $line;
+                }
+                elsif $grammar.parse($line, :rule('test')) -> $test {
+                    my $raw = (|@buffer, $line).join("\n");
+                    if $grammar.parse($raw, :rule('sub-test')) -> $subtest {
+                        emit-reset $subtest;
                     }
                     else {
-                        emit-reset $!grammar.parse($line);
+                        emit-unknown;
+                        emit-reset $test;
                     }
                 }
-                elsif $mode == SubTest {
-                    if $line ~~ &indented {
-                        @buffer.push: $line;
-                    }
-                    elsif $!grammar.parse($line, :rule('test')) -> $test {
-                        my $raw = (|@buffer, $line).join("\n");
-                        if $!grammar.parse($raw, :rule('sub-test')) -> $subtest {
-                            emit-reset $subtest;
+                else {
+                    emit-unknown $line;
+                }
+            }
+            elsif $mode == Yaml {
+                if $line ~~ / ^ '  '  $<content>=[\N*] $ / {
+                    @buffer.push: $line;
+                    if $<content> eq '...' {
+                        my $raw = @buffer.join("\n");
+                        if $grammar.parse($raw, :rule('yaml')) -> $yaml {
+                            emit-reset $yaml;
                         }
                         else {
                             emit-unknown;
-                            emit-reset $test;
                         }
-                    }
-                    else {
-                        emit-unknown $line;
                     }
                 }
-                elsif $mode == Yaml {
-                    if $line ~~ / ^ '  '  $<content>=[\N*] $ / {
-                        @buffer.push: $line;
-                        if $<content> eq '...' {
-                            my $raw = @buffer.join("\n");
-                            if $!grammar.parse($raw, :rule('yaml')) -> $yaml {
-                                emit-reset $yaml;
-                            }
-                            else {
-                                emit-unknown;
-                            }
-                        }
-                    }
-                    else {
-                        emit-unknown $line;
-                    }
+                else {
+                    emit-unknown $line;
                 }
             }
-            LEAVE { emit-unknown }
         }
-        $output.act(-> $entry {
-                @!handlers».handle-entry($entry);
-            },
-            done => {
-                @!handlers».end-entries();
-                $when-done() when $when-done;
-            },
-            quit => {
-                @!handlers».end-entries();
-                $when-done() when $when-done;
-            }
-        );
+        LEAVE { emit-unknown }
+    }
+}
+
+class Parser {
+    has Supply $.output;
+    submethod BUILD(Supply :$input, :@handlers, Callable :$when-done) {
+        $!output = parser($input);
+        for @handlers -> $handler {
+            $!output.act(-> $entry {
+                    $handler.handle-entry($entry);
+                },
+                done => {
+                    $handler.end-entries();
+                },
+                quit => {
+                    $handler.end-entries();
+                }
+            );
+        }
+        when $when-done {
+            $!output.act({}, :done($when-done), :quit($when-done));
+        }
     }
 }
 
