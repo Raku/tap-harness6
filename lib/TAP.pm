@@ -845,10 +845,10 @@ package Runner {
             Run.new(:$events);
         }
 
-        method new(Source :$source, :@handlers, Promise :$bailout) {
+        method new(Source :$source, Promise :$bailout) {
             my $state = State.new(:$bailout);
             my $run = get_runner($source);
-            .listen($run.events) for $state, |@handlers;
+            $state.listen($run.events);
             Async.bless(:name($source.name), :$state, :$run);
         }
 
@@ -935,9 +935,9 @@ class Harness {
             try {
                 for @sources -> $name {
                     my $session = $reporter.open-test($name);
-                    my @handlers = $session;
                     my $source = self.make-source($name);
-                    my $parser = TAP::Runner::Async.new(:$source, :@handlers, :$killed);
+                    my $parser = TAP::Runner::Async.new(:$source, :$killed);
+                    $session.listen($parser.events);
                     self.add-handlers($parser.events);
                     @working.push({ :$parser, :$session, :done($parser.waiter) });
                     next if @working < $!jobs;
