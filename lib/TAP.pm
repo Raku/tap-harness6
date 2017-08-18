@@ -376,13 +376,10 @@ my sub parser(Supply $input --> Supply) {
 
 class Parser {
     has Supply $.output;
-    submethod BUILD(Supply :$input, :@handlers, Callable :$when-done) {
+    submethod BUILD(Supply :$input, :@handlers) {
         $!output = parser($input);
         for @handlers -> $handler {
             $handler.listen($!output);
-        }
-        when $when-done {
-            $!output.act({}, :done($when-done), :quit($when-done));
         }
     }
 }
@@ -793,11 +790,11 @@ package Runner {
     }
     my class Run {
         subset Killable of Any where { .can('kill') };
-        has Promise:D $.process is required;
+        has Supply:D $.events is required;
+        has Promise:D $.process = $!events.Promise;
         has Killable $!killer;
         has Promise $!timer;
-        submethod BUILD(Promise :$!process, Killable :$!killer = Killable, Promise :$!timer) {
-        }
+
         method kill() {
             $!killer.kill if $!process;
         }
@@ -833,9 +830,9 @@ package Runner {
             $!waiter = Promise.allof($!state.done, $!run.process);
         }
 
-        multi get_runner(Source::Proc $proc; TAP::Entry::Handler @handlers) {
+        multi get_runner(Source::Proc $proc) {
             my $async = Proc::Async.new($proc.path, $proc.args);
-            my $parser = TAP::Parser.new(:input($async.stdout), :@handlers);
+            my $events = parser($async.stdout);
             given $proc.err {
                 my $err = $_;
                 when 'stderr' { #default is correct
@@ -860,35 +857,26 @@ package Runner {
             my $process = $async.start;
             my $start-time = now;
             my $timer = $process.then({ now - $start-time });
-            Run.new(:$process, :killer($async), :$timer);
+            Run.new(:$process, :killer($async), :$timer, :$events);
         }
-        multi get_runner(Source::Supply $supply; TAP::Entry::Handler @handlers) {
+        multi get_runner(Source::Supply $supply) {
             my $start-time = now;
-            my $process = Promise.new;
-            my $timer = $process.then({ now - $start-time });
-            my $parser = TAP::Parser.new(:input($supply.supply), :when-done({ $process.keep }) , :@handlers);
-            Run.new(:$process, :$timer);
+            my $events = parser($supply.supply);
+            Run.new(:$events);
         }
-        multi get_runner(Source::File $file; TAP::Entry::Handler @handlers) {
-            my $supplier = Supplier.new;
-            my $parser = TAP::Parser.new(:input($supplier.Supply), :@handlers);
-            Run.new(:process(start {
-                $supplier.emit($file.filename.IO.slurp);
-                $supplier.done();
-            }));
+        multi get_runner(Source::File $file) {
+            my $events = parser(supply { emit $file.filename.IO.slurp(:close) });
+            Run.new(:$events);
         }
-        multi get_runner(Source::String $string; TAP::Entry::Handler @handlers) {
-            my $input = supply { emit $string.content; done }
-            my $parser = TAP::Parser.new(:$input, :@handlers);
-            my $done = Promise.new;
-            $done.keep;
-            Run.new(:process($done));
+        multi get_runner(Source::String $string) {
+            my $events = parser(supply { emit $string.content });
+            Run.new(:$events);
         }
 
         method new(Source :$source, :@handlers, Promise :$bailout) {
             my $state = State.new(:$bailout);
-            my TAP::Entry::Handler @all_handlers = $state, |@handlers;
-            my $run = get_runner($source, @all_handlers);
+            my $run = get_runner($source);
+            .listen($run.events) for $state, |@handlers;
             Async.bless(:name($source.name), :$state, :$run);
         }
 
@@ -897,7 +885,6 @@ package Runner {
             await $!waiter;
             $!result //= $!state.finalize($!name, $!run.exit-status, $!run.time);
         }
-
     }
 
     class Sync {
