@@ -662,6 +662,7 @@ my class State does TAP::Entry::Handler {
     has Seen $!seen-plan = Unseen;
     has Promise $.done = Promise.new;
     has Int $!version;
+    has Bool $.loose;
 
     proto method handle-entry(TAP::Entry $entry) {
         if $!seen-plan == After && $entry !~~ TAP::Comment {
@@ -713,7 +714,7 @@ my class State does TAP::Entry::Handler {
         @!todo-passed.push($usable-number) if $test.ok && $test.directive == TAP::Todo;
         $!skipped++ if $test.directive == TAP::Skip;
 
-        if $test ~~ TAP::Sub-Test {
+        if !$!loose && $test ~~ TAP::Sub-Test {
             for $test.inconsistencies(~$usable-number) -> $error {
                 self!add-error($error);
             }
@@ -840,8 +841,8 @@ class Async {
         Run.new(:$events);
     }
 
-    method new(Source :$source, Promise :$bailout) {
-        my $state = State.new(:$bailout);
+    method new(Source :$source, Promise :$bailout, Bool :$loose) {
+        my $state = State.new(:$bailout, :$loose);
         my $run = get_runner($source);
         $state.listen($run.events);
         Async.bless(:name($source.name), :$state, :$run);
@@ -893,6 +894,7 @@ class Harness {
     has ErrValue $.err = 'stderr';
     has Bool:D $.ignore-exit = False;
     has Bool:D $.trap = False;
+    has Bool:D $.loose = False;
 
     class Run {
         has Promise $.waiter handles <result>;
@@ -930,7 +932,7 @@ class Harness {
                 for @sources -> $name {
                     my $session = $reporter.open-test($name);
                     my $source = self.make-source($name);
-                    my $parser = TAP::Async.new(:$source, :$killed);
+                    my $parser = TAP::Async.new(:$source, :$killed, :$!loose);
                     $session.listen($parser.events);
                     self.add-handlers($parser.events);
                     @working.push({ :$parser, :$session, :done($parser.waiter) });
