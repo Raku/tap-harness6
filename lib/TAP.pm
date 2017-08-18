@@ -90,14 +90,6 @@ class Output does Entry::Handler {
     }
 }
 
-class Collector does Entry::Handler {
-    has @.entries;
-    submethod BUILD() { }
-    method handle-entry(Entry $entry) {
-         @!entries.push($entry);
-    }
-}
-
 class Result {
     has Str $.name;
     has Int $.tests-planned;
