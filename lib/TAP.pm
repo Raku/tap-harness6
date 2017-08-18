@@ -641,222 +641,216 @@ class Reporter::Console does Reporter {
     }
 }
 
-package Runner {
-    class State does TAP::Entry::Handler {
-        has Range $.allowed-versions = 12 .. 13;
-        has Int $!tests-planned;
-        has Int $!tests-run = 0;
-        has Int $!passed = 0;
-        has Int @!failed;
-        has Str @!errors;
-        has Int $!actual-passed = 0;
-        has Int $!actual-failed = 0;
-        has Int $!todo = 0;
-        has Int @!todo-passed;
-        has Int $!skipped = 0;
-        has Int $!unknowns = 0;
-        has Bool $!skip-all = False;
+my class State does TAP::Entry::Handler {
+    has Range $.allowed-versions = 12 .. 13;
+    has Int $!tests-planned;
+    has Int $!tests-run = 0;
+    has Int $!passed = 0;
+    has Int @!failed;
+    has Str @!errors;
+    has Int $!actual-passed = 0;
+    has Int $!actual-failed = 0;
+    has Int $!todo = 0;
+    has Int @!todo-passed;
+    has Int $!skipped = 0;
+    has Int $!unknowns = 0;
+    has Bool $!skip-all = False;
 
-        has Promise $.bailout;
-        has Int $!seen-lines = 0;
-        enum Seen <Unseen Before After>;
-        has Seen $!seen-plan = Unseen;
-        has Promise $.done = Promise.new;
-        has Int $!version;
+    has Promise $.bailout;
+    has Int $!seen-lines = 0;
+    enum Seen <Unseen Before After>;
+    has Seen $!seen-plan = Unseen;
+    has Promise $.done = Promise.new;
+    has Int $!version;
 
-        proto method handle-entry(TAP::Entry $entry) {
-            if $!seen-plan == After && $entry !~~ TAP::Comment {
-                self!add-error("Got line $entry after late plan");
-            }
-            {*};
-            $!seen-lines++;
+    proto method handle-entry(TAP::Entry $entry) {
+        if $!seen-plan == After && $entry !~~ TAP::Comment {
+            self!add-error("Got line $entry after late plan");
         }
-        multi method handle-entry(TAP::Version $entry) {
-            if $!seen-lines {
-                self!add-error('Seen version declaration mid-stream');
-            }
-            elsif $entry.version !~~ $!allowed-versions {
-                self!add-error("Version must be in range $!allowed-versions");
-            }
-            else {
-                $!version = $entry.version;
-            }
+        {*};
+        $!seen-lines++;
+    }
+    multi method handle-entry(TAP::Version $entry) {
+        if $!seen-lines {
+            self!add-error('Seen version declaration mid-stream');
         }
-        multi method handle-entry(TAP::Plan $plan) {
-            if $!seen-plan != Unseen {
-                self!add-error('Seen a second plan');
-            }
-            else {
-                $!tests-planned = $plan.tests;
-                $!seen-plan = $!tests-run ?? After !! Before;
-                $!skip-all = $plan.skip-all;
-            }
+        elsif $entry.version !~~ $!allowed-versions {
+            self!add-error("Version must be in range $!allowed-versions");
         }
-        multi method handle-entry(TAP::Test $test) {
-            my $found-number = $test.number;
-            my $expected-number = ++$!tests-run;
-            if $found-number.defined && ($found-number != $expected-number) {
-                self!add-error("Tests out of sequence.  Found ($found-number) but expected ($expected-number)");
-            }
-            if $!seen-plan == After {
-                self!add-error("Plan must be at the beginning or end of the TAP output");
-            }
-
-            my $usable-number = $found-number // $expected-number;
-            if $test.is-ok {
-                $!passed++;
-            }
-            else {
-                @!failed.push($usable-number);
-            }
-            ($test.ok ?? $!actual-passed !! $!actual-failed)++;
-            $!todo++ if $test.directive == TAP::Todo;
-            @!todo-passed.push($usable-number) if $test.ok && $test.directive == TAP::Todo;
-            $!skipped++ if $test.directive == TAP::Skip;
-
-            if $test ~~ TAP::Sub-Test {
-                for $test.inconsistencies(~$usable-number) -> $error {
-                    self!add-error($error);
-                }
-            }
-        }
-        multi method handle-entry(TAP::Bailout $entry) {
-            if $!bailout.defined {
-                $!bailout.break($entry);
-            }
-            else {
-                $!done.break($entry);
-            }
-        }
-        multi method handle-entry(TAP::Unknown $) {
-            $!unknowns++;
-        }
-        multi method handle-entry(TAP::Entry $entry) {
-        }
-
-        method end-entries() {
-            if $!seen-plan == Unseen {
-                self!add-error('No plan found in TAP output');
-            }
-            elsif $!tests-run != $!tests-planned {
-                self!add-error("Bad plan.  You planned $!tests-planned tests but ran $!tests-run.");
-            }
-            $!done.keep;
-        }
-        method finalize(Str $name, Proc $exit-status, Duration $time) {
-            TAP::Result.new(:$name, :$!tests-planned, :$!tests-run, :$!passed, :@!failed, :@!errors, :$!skip-all,
-                :$!actual-passed, :$!actual-failed, :$!todo, :@!todo-passed, :$!skipped, :$!unknowns, :$exit-status, :$time);
-        }
-        method !add-error(Str $error) {
-            push @!errors, $error;
+        else {
+            $!version = $entry.version;
         }
     }
-
-    class Async { ... }
-
-    role Source {
-        has Str $.name;
-        method make-parser(:@handlers, Promise :$promise) {
-            Async.new(:source(self), :@handlers, :$promise);
+    multi method handle-entry(TAP::Plan $plan) {
+        if $!seen-plan != Unseen {
+            self!add-error('Seen a second plan');
+        }
+        else {
+            $!tests-planned = $plan.tests;
+            $!seen-plan = $!tests-run ?? After !! Before;
+            $!skip-all = $plan.skip-all;
         }
     }
-    my class Run {
-        subset Killable of Any where { .can('kill') };
-        has Supply:D $.events is required;
-        has Promise:D $.process = $!events.Promise;
-        has Killable $!killer;
-        has Promise $!timer;
-
-        method kill() {
-            $!killer.kill if $!process;
+    multi method handle-entry(TAP::Test $test) {
+        my $found-number = $test.number;
+        my $expected-number = ++$!tests-run;
+        if $found-number.defined && ($found-number != $expected-number) {
+            self!add-error("Tests out of sequence.  Found ($found-number) but expected ($expected-number)");
         }
-        method exit-status() {
-            $!process.result ~~ Proc ?? $.process.result !! Proc;
-        }
-        method time() {
-            $!timer.defined ?? $!timer.result !! Duration;
-        }
-    }
-    class Source::Proc does Source {
-        has Str $.path is required;
-        has @.args;
-        has $.err is required;
-    }
-    class Source::File does Source {
-        has Str $.filename;
-    }
-    class Source::String does Source {
-        has Str $.content;
-    }
-    class Source::Supply does Source {
-        has Supply $.supply;
-    }
-
-    class Async {
-        has Str $.name;
-        has Run $!run handles <kill events>;
-        has State $!state;
-        has Promise $.waiter;
-
-        submethod BUILD(Str :$!name, State :$!state, Run :$!run) {
-            $!waiter = Promise.allof($!state.done, $!run.process);
+        if $!seen-plan == After {
+            self!add-error("Plan must be at the beginning or end of the TAP output");
         }
 
-        multi get_runner(Source::Proc $proc) {
-            my $async = Proc::Async.new($proc.path, $proc.args);
-            my $events = parser($async.stdout);
-            given $proc.err {
-                my $err = $_;
-                when 'stderr' { #default is correct
-                }
-                when 'merge' {
-                    warn "Merging isn't supported yet on Asynchronous streams";
-                    $async.stderr;
-                }
-                when 'ignore' {
-                    $async.stderr;
-                }
-                when IO::Handle:D {
-                    $async.stderr.lines(:close).act({ $err.say($_) });
-                }
-                when Supply:D {
-                    $async.stderr.act({ $err.emit($_) }, :done({ $err.done }), :quit({ $err.quit($^reason) }));
-                }
-                default {
-                    die "Unknown error handler";
-                }
+        my $usable-number = $found-number // $expected-number;
+        if $test.is-ok {
+            $!passed++;
+        }
+        else {
+            @!failed.push($usable-number);
+        }
+        ($test.ok ?? $!actual-passed !! $!actual-failed)++;
+        $!todo++ if $test.directive == TAP::Todo;
+        @!todo-passed.push($usable-number) if $test.ok && $test.directive == TAP::Todo;
+        $!skipped++ if $test.directive == TAP::Skip;
+
+        if $test ~~ TAP::Sub-Test {
+            for $test.inconsistencies(~$usable-number) -> $error {
+                self!add-error($error);
             }
-            my $process = $async.start;
-            my $start-time = now;
-            my $timer = $process.then({ now - $start-time });
-            Run.new(:$process, :killer($async), :$timer, :$events);
         }
-        multi get_runner(Source::Supply $supply) {
-            my $start-time = now;
-            my $events = parser($supply.supply);
-            Run.new(:$events);
+    }
+    multi method handle-entry(TAP::Bailout $entry) {
+        if $!bailout.defined {
+            $!bailout.break($entry);
         }
-        multi get_runner(Source::File $file) {
-            my $events = parser(supply { emit $file.filename.IO.slurp(:close) });
-            Run.new(:$events);
+        else {
+            $!done.break($entry);
         }
-        multi get_runner(Source::String $string) {
-            my $events = parser(supply { emit $string.content });
-            Run.new(:$events);
-        }
+    }
+    multi method handle-entry(TAP::Unknown $) {
+        $!unknowns++;
+    }
+    multi method handle-entry(TAP::Entry $entry) {
+    }
 
-        method new(Source :$source, Promise :$bailout) {
-            my $state = State.new(:$bailout);
-            my $run = get_runner($source);
-            $state.listen($run.events);
-            Async.bless(:name($source.name), :$state, :$run);
+    method end-entries() {
+        if $!seen-plan == Unseen {
+            self!add-error('No plan found in TAP output');
         }
+        elsif $!tests-run != $!tests-planned {
+            self!add-error("Bad plan.  You planned $!tests-planned tests but ran $!tests-run.");
+        }
+        $!done.keep;
+    }
+    method finalize(Str $name, Proc $exit-status, Duration $time) {
+        TAP::Result.new(:$name, :$!tests-planned, :$!tests-run, :$!passed, :@!failed, :@!errors, :$!skip-all,
+            :$!actual-passed, :$!actual-failed, :$!todo, :@!todo-passed, :$!skipped, :$!unknowns, :$exit-status, :$time);
+    }
+    method !add-error(Str $error) {
+        push @!errors, $error;
+    }
+}
 
-        has TAP::Result $!result;
-        method result {
-            await $!waiter;
-            $!result //= $!state.finalize($!name, $!run.exit-status, $!run.time);
+my class Run {
+    subset Killable of Any where { .can('kill') };
+    has Supply:D $.events is required;
+    has Promise:D $.process = $!events.Promise;
+    has Killable $!killer;
+    has Promise $!timer;
+
+    method kill() {
+        $!killer.kill if $!process;
+    }
+    method exit-status() {
+        $!process.result ~~ Proc ?? $.process.result !! Proc;
+    }
+    method time() {
+        $!timer.defined ?? $!timer.result !! Duration;
+    }
+}
+
+role Source {
+    has Str $.name;
+}
+class Source::Proc does Source {
+    has Str $.path is required;
+    has @.args;
+    has $.err is required;
+}
+class Source::File does Source {
+    has Str $.filename;
+}
+class Source::String does Source {
+    has Str $.content;
+}
+class Source::Supply does Source {
+    has Supply $.supply;
+}
+
+class Async {
+    has Str $.name;
+    has Run $!run handles <kill events>;
+    has State $!state;
+    has Promise $.waiter;
+
+    submethod BUILD(Str :$!name, State :$!state, Run :$!run) {
+        $!waiter = Promise.allof($!state.done, $!run.process);
+    }
+
+    multi get_runner(Source::Proc $proc) {
+        my $async = Proc::Async.new($proc.path, $proc.args);
+        my $events = parser($async.stdout);
+        given $proc.err {
+            my $err = $_;
+            when 'stderr' { #default is correct
+            }
+            when 'merge' {
+                warn "Merging isn't supported yet on Asynchronous streams";
+                $async.stderr;
+            }
+            when 'ignore' {
+                $async.stderr;
+            }
+            when IO::Handle:D {
+                $async.stderr.lines(:close).act({ $err.say($_) });
+            }
+            when Supply:D {
+                $async.stderr.act({ $err.emit($_) }, :done({ $err.done }), :quit({ $err.quit($^reason) }));
+            }
+            default {
+                die "Unknown error handler";
+            }
         }
+        my $process = $async.start;
+        my $start-time = now;
+        my $timer = $process.then({ now - $start-time });
+        Run.new(:$process, :killer($async), :$timer, :$events);
+    }
+    multi get_runner(Source::Supply $supply) {
+        my $start-time = now;
+        my $events = parser($supply.supply);
+        Run.new(:$events);
+    }
+    multi get_runner(Source::File $file) {
+        my $events = parser(supply { emit $file.filename.IO.slurp(:close) });
+        Run.new(:$events);
+    }
+    multi get_runner(Source::String $string) {
+        my $events = parser(supply { emit $string.content });
+        Run.new(:$events);
+    }
+
+    method new(Source :$source, Promise :$bailout) {
+        my $state = State.new(:$bailout);
+        my $run = get_runner($source);
+        $state.listen($run.events);
+        Async.bless(:name($source.name), :$state, :$run);
+    }
+
+    has TAP::Result $!result;
+    method result {
+        await $!waiter;
+        $!result //= $!state.finalize($!name, $!run.exit-status, $!run.time);
     }
 }
 
@@ -869,7 +863,7 @@ class Harness {
         has Str:D $.path is required;
         has @.args;
         method make-source(Str:D $name, Any:D :$err) {
-            TAP::Runner::Source::Proc.new(:$name, :$!path, :args[ |@!args, $name ], :$err);
+            TAP::Source::Proc.new(:$name, :$!path, :args[ |@!args, $name ], :$err);
         }
     }
     class SourceHandler::Perl6 does SourceHandler::Proc {
@@ -936,7 +930,7 @@ class Harness {
                 for @sources -> $name {
                     my $session = $reporter.open-test($name);
                     my $source = self.make-source($name);
-                    my $parser = TAP::Runner::Async.new(:$source, :$killed);
+                    my $parser = TAP::Async.new(:$source, :$killed);
                     $session.listen($parser.events);
                     self.add-handlers($parser.events);
                     @working.push({ :$parser, :$session, :done($parser.waiter) });

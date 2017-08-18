@@ -5,8 +5,8 @@ use Test;
 
 plan 4;
 
-my $source = TAP::Runner::Source::File.new(:filename('t/source-file-test-data'));
-my $parser = TAP::Runner::Async.new(:$source);
+my $source = TAP::Source::File.new(:filename('t/source-file-test-data'));
+my $parser = TAP::Async.new(:$source);
 await $parser.waiter;
 my $result = $parser.result;
 
