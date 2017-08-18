@@ -80,16 +80,6 @@ role Entry::Handler {
     }
 }
 
-class Output does Entry::Handler {
-    has IO::Handle $.handle = $*OUT;
-    method handle-entry(Entry $entry) {
-        $!handle.say(~$entry);
-    }
-    method end-entries() {
-        $!handle.flush;
-    }
-}
-
 class Result {
     has Str $.name;
     has Int $.tests-planned;
@@ -804,7 +794,7 @@ package Runner {
 
     class Async {
         has Str $.name;
-        has Run $!run handles <kill>;
+        has Run $!run handles <kill events>;
         has State $!state;
         has Promise $.waiter;
 
@@ -923,8 +913,10 @@ class Harness {
     method make-aggregator() {
         TAP::Aggregator.new(:$!ignore-exit);
     }
-    method make-handlers(Str $name) {
-        $.volume == Verbose ?? TAP::Output.new(:$!handle) !! ()
+    method add-handlers(Supply $events) {
+        if $.volume == Verbose {
+            $events.act({ $!handle.say(~$^entry) }, :done({ $!handle.flush }), :quit({ $!handle.flush }));
+        }
     }
     method make-source(Str $name) {
         @!handlers.max(*.can-handle($name)).make-source($name, :$!err);
@@ -943,9 +935,10 @@ class Harness {
             try {
                 for @sources -> $name {
                     my $session = $reporter.open-test($name);
-                    my @handlers = $session, |self.make-handlers($name);
+                    my @handlers = $session;
                     my $source = self.make-source($name);
                     my $parser = TAP::Runner::Async.new(:$source, :@handlers, :$killed);
+                    self.add-handlers($parser.events);
                     @working.push({ :$parser, :$session, :done($parser.waiter) });
                     next if @working < $!jobs;
                     await Promise.anyof(@working»<done>, $killed);
