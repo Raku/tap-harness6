@@ -33,7 +33,7 @@ class Sub-Test is Test {
     method inconsistencies(Str $usable-number = ~($.number // '?')) {
         my @errors;
         my @tests = @!entries.grep(Test);
-        if $.ok != ?all(@tests).is-ok {
+        if $.is-ok != ?all(@tests).is-ok {
             @errors.push: "Subtest $usable-number isn't coherent";
         }
         my @plans = @!entries.grep(Plan);
