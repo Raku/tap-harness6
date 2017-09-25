@@ -167,7 +167,7 @@ class Aggregator {
 }
 
 my grammar Grammar {
-    token TOP {
+    regex TOP {
         ^ [ <plan> | <test> | <bailout> | <version> | <comment> || <unknown> ] $
     }
     token sp { <[\s] - [\n]> }
