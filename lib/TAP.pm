@@ -894,7 +894,7 @@ class Harness {
     has ErrValue $.err = 'stderr';
     has Bool:D $.ignore-exit = False;
     has Bool:D $.trap = False;
-    has Bool:D $.loose = False;
+    has Bool:D $.loose = $*PERL.compiler.version before 2017.09;
 
     class Run {
         has Promise $.waiter handles <result>;
