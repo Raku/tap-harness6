@@ -91,7 +91,7 @@ and can live with the risk.
 
 * `--err=ignore`
 
-  Ignore the test script' `$*ERR`
+  Ignore the test scripts' `$*ERR`
 
 
 ## `--trap`
