@@ -28,8 +28,7 @@ $harness.run(@tests);
 ### new
 
 ```Perl 6
-my %args = jobs => 1,
-   				 err  => 'ignore';
+my %args = jobs => 1, err  => 'ignore';
 my $harness = TAP::Harness.new( |%args );
 ```
 
