@@ -60,13 +60,15 @@ It accepts an optional hash whose allowed keys are:
 
   Default value: `stderr`
 
-  Possible values: `stderr` `ignore` `merge`
+  Possible values: `stderr` `ignore` `merge` `Supply` `IO::Handle`
 
-  |Value   |Definition                                        |
-  |--------|--------------------------------------------------|
-  |`stderr`|Direct the test's `$*ERR` to the harness' `$*ERR` |
-  |`ignore`|Ignore the test scripts' `$*ERR`                  |
-  |`merge` |Merge the test scripts' `$*ERR` into their `$*OUT`|
+  |Value       |Definition                                        |
+  |------------|--------------------------------------------------|
+  |`stderr`    |Direct the test's `$*ERR` to the harness' `$*ERR` |
+  |`ignore`    |Ignore the test scripts' `$*ERR`                  |
+  |`merge`     |Merge the test scripts' `$*ERR` into their `$*OUT`|
+  |`Supply`    |Direct the test's `$*ERR` to a `Supply`           |
+  |`IO::Handle`|Direct the test's `$*ERR` to an `IO::Handle`      |
 * `ignore-exit`
 
   If set to `True` will instruct `TAP::Parser` to ignore exit and wait for status from test scripts.
