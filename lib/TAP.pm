@@ -1,6 +1,7 @@
 use v6;
 
-unit package TAP;
+unit module TAP:ver<0.0.4>;
+
 role Entry {
     has Str:D $.raw is required handles <Str>;
 }
