@@ -2,14 +2,17 @@
 
 use TAP;
 
-my $path-sep = $*DISTRO.path-sep;
-
-multi listall(IO::Path $path where .d) {
-	return $path.dir(:test(rx/\.t$/)).flatmap(&listall);
+multi sub listall(IO::Path $path where .d) {
+    for $path.dir -> $entry {
+        listall($entry);
+    }
 }
 multi listall(IO::Path $path) {
-	return ~$path;
+    when $path.f && $path ~~ /.t$/ {
+        take ~$path;
+    }
 }
+
 sub load(Str $classname) {
 	my $loaded = try ::($classname);
 	return $loaded if $loaded !eqv Any;
@@ -43,7 +46,7 @@ multi sub MAIN(
 		%more<reporter-class> = load($reporter);
 	}
 	%more<volume> = TAP::Verbose if $verbose;
-	my @sources = @files.map(*.IO).flatmap(&listall);
+	my @sources = gather { listall($_.IO) for @files }
 	@sources = $shuffle ?? @sources.pick(*) !! @sources.sort;
 	@sources = @sources.reverse if $reverse;
 	my %args = :$jobs, :$timer, :$ignore-exit, :$err, :$loose, |%more;
