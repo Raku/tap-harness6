@@ -527,7 +527,9 @@ class Reporter::Text does Reporter {
 }
 
 class Formatter::Console is Formatter::Text {
-    my &colored = try { EVAL q{ use Terminal::ANSIColor; &colored } } // sub ($text, $) { $text }
+    my &colored = (try require Terminal::ANSIColor) === Nil
+        ?? sub ($text, $) { $text }
+        !! ::('Terminal::ANSIColor::EXPORT::DEFAULT::&colored');
     method format-success(Str $output) {
         colored($output, 'green');
     }
