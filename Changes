@@ -1,5 +1,8 @@
 Revision history for TAP
 
+0.0.6
+        - Reupload to fix packaging issues
+
 0.0.5
         - Make prove6 look for files recursively
         - Work around a module loading bug involving dynamic loading
