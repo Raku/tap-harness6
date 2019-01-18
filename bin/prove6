@@ -64,7 +64,7 @@ multi sub MAIN(Bool :$help!) {
 	}
 }
 multi sub MAIN(Bool :$version!) {
-	say "prove6 0.0.3 on $*PERL";
+	say "prove6 0.0.4 on $*PERL";
 }
 
 =begin pod
