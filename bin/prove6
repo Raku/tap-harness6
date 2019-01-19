@@ -21,14 +21,13 @@ sub load(Str $classname) {
 }
 
 multi sub MAIN(
-	Bool :l($lib), Bool :b($blib), Bool :$timer = False, Int :j($jobs) = 1,
-	Bool :$ignore-exit = False, Bool :$trap = False, Bool :v($verbose) = False,
-	Bool :$shuffle = False, Str :$err = 'stderr', Bool :$reverse = False,
+	Bool :l($lib), Bool :b($blib), Bool :$timer, Int :j($jobs),
+	Bool :$ignore-exit, Bool :$trap, Bool :v($verbose),
+	Bool :$shuffle, Str :$err, Bool :$reverse,
 	Str :e($exec), Str :$harness, Str :$reporter, :I($incdir),
-	Bool :$loose = $*PERL.compiler.version before 2017.09,
-	*@files) {
+	Bool :$loose, *@files) {
 	@files = 't' if not @files;
-	die "Invalid value '$err' for --err\n" if $err ne any('stderr','merge','ignore');
+	die "Invalid value '$err' for --err\n" if defined $err && $err ne any('stderr','merge','ignore');
 
 	my %more;
 	with $exec {
@@ -49,8 +48,8 @@ multi sub MAIN(
 	my @sources = gather { listall($_.IO) for @files }
 	@sources = $shuffle ?? @sources.pick(*) !! @sources.sort;
 	@sources = @sources.reverse if $reverse;
-	my %args = :$jobs, :$timer, :$ignore-exit, :$err, :$loose, |%more;
-	my $run = $harness-class.new(|%args).run(@sources);
+	my %args = grep *.value.defined, (:$jobs, :$timer, :$trap, :$ignore-exit, :$err, :$loose);
+	my $run = $harness-class.new(|%args, |%more).run(@sources);
 	exit min($run.result.has-errors, 254);
 }
 
