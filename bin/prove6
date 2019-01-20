@@ -8,7 +8,7 @@ multi sub listall(IO::Path $path where .d) {
     }
 }
 multi listall(IO::Path $path) {
-    when $path.f && $path ~~ /\.t$/ {
+    if $path.f && $path.extension eq 't'|'t6' {
         take ~$path;
     }
 }

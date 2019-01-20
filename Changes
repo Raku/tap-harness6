@@ -1,5 +1,6 @@
 Revision history for TAP
 
+        - Run all and only .t and .t6 files
         - Automatically set some configuration values from environment
 
 0.0.6
