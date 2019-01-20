@@ -889,13 +889,14 @@ class Harness {
 
     has SourceHandler @.handlers = SourceHandler::Perl6.new();
     has IO::Handle $.handle = $*OUT;
-    has Formatter::Volume $.volume = Normal;
+    has Formatter::Volume $.volume = ?%*ENV<HARNESS_VERBOSE> ?? Verbose !! Normal;
     has TAP::Reporter:U $.reporter-class = $!handle.t && $!volume < Verbose ?? TAP::Reporter::Console !! TAP::Reporter::Text;
-    has Int:D $.jobs = 1;
-    has Bool:D $.timer = False;
+    has Str %!env-options = (%*ENV<HARNESS_OPTIONS> // '').split(':').grep(*.chars).map: { / ^ (.) (.*) $ /; ~$0 => val(~$1) };
+    has Int:D $.jobs = %!env-options<j> // 1;
+    has Bool:D $.timer = ?%*ENV<HARNESS_TIMER>;
     subset ErrValue where any(IO::Handle:D, Supply, 'stderr', 'ignore', 'merge');
     has ErrValue $.err = 'stderr';
-    has Bool:D $.ignore-exit = False;
+    has Bool:D $.ignore-exit = ?%*ENV<HARNESS_INGORE_EXIT>;
     has Bool:D $.trap = False;
     has Bool:D $.loose = $*PERL.compiler.version before 2017.09;
 

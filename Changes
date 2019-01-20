@@ -1,5 +1,7 @@
 Revision history for TAP
 
+        - Automatically set some configuration values from environment
+
 0.0.6
         - Reupload to fix packaging issues
 
