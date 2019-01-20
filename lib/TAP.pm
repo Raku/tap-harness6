@@ -527,14 +527,15 @@ class Reporter::Text does Reporter {
 }
 
 class Formatter::Console is Formatter::Text {
-    my &colored = (try require Terminal::ANSIColor) === Nil
-        ?? sub ($text, $) { $text }
-        !! ::('Terminal::ANSIColor::EXPORT::DEFAULT::&colored');
+    has $.color;
+	has &colored = $!color && (try require Terminal::ANSIColor) !=== Nil
+		?? ::('Terminal::ANSIColor::EXPORT::DEFAULT::&colored')
+		!! sub ($text, $) { $text };
     method format-success(Str $output) {
-        colored($output, 'green');
+        &colored($output, 'green');
     }
     method format-failure(Str $output) {
-        colored($output, 'red');
+        &colored($output, 'red');
     }
     method format-return(Str $output) {
         "\r$output";
@@ -577,8 +578,8 @@ class Reporter::Console does Reporter {
     has Int $!tests;
     has Int $!fails;
 
-    submethod BUILD(:@names, IO::Handle :$handle = $*OUT, :$volume = Normal, :$timer = False, Bool :$ignore-exit = False) {
-        $!formatter = Formatter::Console.new(:@names, :$volume, :$timer, :$ignore-exit);
+    submethod BUILD(:@names, IO::Handle :$handle = $*OUT, :$volume = Normal, :$timer = False, Bool :$ignore-exit = False, Bool :$color) {
+        $!formatter = Formatter::Console.new(:@names, :$volume, :$timer, :$ignore-exit, :$color);
         $!lastlength = 0;
         $!events = Supplier.new;
         @!active .= new;
@@ -899,6 +900,8 @@ class Harness {
     has Bool:D $.ignore-exit = ?%*ENV<HARNESS_INGORE_EXIT>;
     has Bool:D $.trap = False;
     has Bool:D $.loose = $*PERL.compiler.version before 2017.09;
+    my @safe-terminals = <xterm eterm vte konsole color>;
+    has Bool:D $.color = so %!env-options<c> // %*ENV<HARNESS_COLOR> // !%*ENV<NO_COLOR>.defined && $!handle.t && (%*ENV<TERM> // '') ~~ / @safe-terminals /;
 
     class Run {
         has Promise $.waiter handles <result>;
@@ -926,7 +929,7 @@ class Harness {
     method run(*@sources) {
         my $killed = Promise.new;
         my $aggregator = self.make-aggregator;
-        my $reporter = $!reporter-class.new(:names(@sources), :$!timer, :$!ignore-exit, :$!volume, :$!handle);
+        my $reporter = $!reporter-class.new(:names(@sources), :$!timer, :$!ignore-exit, :$!volume, :$!handle, :$!color);
 
         my @working;
         my $waiter = start {

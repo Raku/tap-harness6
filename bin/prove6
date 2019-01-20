@@ -25,7 +25,7 @@ multi sub MAIN(
 	Bool :$ignore-exit, Bool :$trap, Bool :v($verbose),
 	Bool :$shuffle, Str :$err, Bool :$reverse,
 	Str :e($exec), Str :$harness, Str :$reporter, :I($incdir),
-	Bool :$loose, *@files) {
+	Bool :$loose, Bool :$color, *@files) {
 	@files = 't' if not @files;
 	die "Invalid value '$err' for --err\n" if defined $err && $err ne any('stderr','merge','ignore');
 
@@ -48,7 +48,7 @@ multi sub MAIN(
 	my @sources = gather { listall($_.IO) for @files }
 	@sources = $shuffle ?? @sources.pick(*) !! @sources.sort;
 	@sources = @sources.reverse if $reverse;
-	my %args = grep *.value.defined, (:$jobs, :$timer, :$trap, :$ignore-exit, :$err, :$loose);
+	my %args = grep *.value.defined, (:$jobs, :$timer, :$trap, :$ignore-exit, :$err, :$loose, :$color);
 	my $run = $harness-class.new(|%args, |%more).run(@sources);
 	exit min($run.result.has-errors, 254);
 }
@@ -119,8 +119,6 @@ is disabled.
 
 Color support requires C<Terminal::ANSIColor> on Unix-like platforms. If the
 necessary module is not installed colored output will not be available.
-
-PS: Currently not available.
 
 =head2 Exit Code
 
