@@ -3,7 +3,7 @@
 use TAP;
 
 multi sub listall(IO::Path $path where .d) {
-    for $path.dir -> $entry {
+    for $path.dir(:test{ !$^file.starts-with('.') }) -> $entry {
         listall($entry);
     }
 }
