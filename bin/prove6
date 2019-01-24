@@ -55,15 +55,10 @@ multi sub MAIN(
 
 multi sub MAIN(Bool :$help!) {
 	require Pod::To::Text;
-	my $text = ::('Pod::To::Text').render($=pod[0]);
-	with %*ENV<PERLDOC_PAGER> // %*ENV<PAGER> -> $pager {
-		my $proc = shell($pager, :in);
-		$proc.in.print($text);
-		$proc.in.close;
-	}
-	else {
-		say $text;
-	}
+	my @contents = $=pod[0].contents.grep: { $_ ~~ Pod::Heading && .contents[0].contents eq 'USAGE' ^fff^ $_ ~~ Pod::Heading };
+	my $usage-pod = Pod::Block::Named.new(:name<prove6>, :@contents);
+	my $text = ::('Pod::To::Text').render($usage-pod);
+	say $text;
 }
 multi sub MAIN(Bool :$version!) {
 	say "prove6 0.0.7 on $*PERL";
@@ -78,8 +73,6 @@ prove6 - Run tests through a TAP harness.
 =head1 USAGE
 
  prove6 [options] [files or directories]
-
-=head1 OPTIONS
 
 Boolean options:
 
