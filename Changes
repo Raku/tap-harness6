@@ -1,5 +1,7 @@
 Revision history for TAP
 
+{{$NEXT}}
+        - Move prove6 to App::Prove6
         - Make coloring optional
 
 0.0.7
