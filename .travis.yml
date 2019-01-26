@@ -4,4 +4,4 @@ language: perl6
 perl6:
   - latest
 script:
-  - perl6 -Ilib bin/prove6 -l t
+  - PERL6LIB=lib perl6 -MTAP -e 'exit(TAP::Harness.new.run(@*ARGS).result.has-errors)' t/*.t
