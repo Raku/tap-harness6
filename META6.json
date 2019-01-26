@@ -39,5 +39,5 @@
   "source-url" : "git://github.com/perl6/tap-harness6.git",
   "tags" : [ ],
   "test-depends" : [ ],
-  "version" : "0.0.7"
+  "version" : "0.0.8"
 }
