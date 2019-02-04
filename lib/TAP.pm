@@ -809,12 +809,11 @@ class Async {
             my $err = $_;
             when 'stderr' { #default is correct
             }
-            when 'merge' {
-                warn "Merging isn't supported yet on Asynchronous streams";
-                $async.bind-stderr(open($*SPEC.devnull, :w))
-            }
-            when 'ignore' {
-                $async.bind-stderr(open($*SPEC.devnull, :w))
+            when 'merge'|'ignore' {
+                warn "Merging isn't supported yet on Asynchronous streams" if $_ eq 'merge';
+                state $devnull = open($*SPEC.devnull, :w);
+                $async.bind-stderr($devnull);
+                END { $devnull.close with $devnull }
             }
             when IO::Handle:D {
                 $async.stderr.lines(:close).act({ $err.say($_) });
