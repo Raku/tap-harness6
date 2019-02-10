@@ -386,7 +386,7 @@ class Reporter::Text::Session does Session {
 class Formatter::Text does Formatter {
     has Int $!longest;
 
-    submethod BUILD(:@names) {
+    submethod TWEAK(:@names) {
         $!longest = @names ?? @names».chars.max !! 12;
     }
     method format-name($name) {
