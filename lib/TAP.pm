@@ -528,9 +528,9 @@ class Reporter::Text does Reporter {
 
 class Formatter::Console is Formatter::Text {
     has $.color;
-	has &colored = $!color && (try require Terminal::ANSIColor) !=== Nil
-		?? ::('Terminal::ANSIColor::EXPORT::DEFAULT::&colored')
-		!! sub ($text, $) { $text };
+    has &colored = $!color && (try require Terminal::ANSIColor) !=== Nil
+        ?? ::('Terminal::ANSIColor::EXPORT::DEFAULT::&colored')
+        !! sub ($text, $) { $text };
     method format-success(Str $output) {
         &colored($output, 'green');
     }
@@ -984,3 +984,5 @@ class Harness {
         Run.new(:$waiter, :$killed);
     }
 }
+
+# ts=4 sw=4 et
