@@ -8,10 +8,10 @@ An asynchronous TAP framework written in Perl 6.
 
 # prove6
 
-This module provides the `prove6` command which runs a TAP based test suite and prints a report.
+This module provides support for the `prove6` command which runs a TAP based test suite and prints a report. The actual command is in the App::prove6 module.
 The `prove6` command is a minimal wrapper around an instance of this module.
 
-For a detailed documentation on how to use `prove6` [click here](./README-prove6.md) or run `prove6 --help`
+For a detailed documentation on how to use `prove6` [click here](https://github.com/Leont/app-prove6/blob/master/README.md) or run `prove6 --help` (once it's been installed)
 
 # SYNOPSIS
 
