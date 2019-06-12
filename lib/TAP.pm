@@ -37,9 +37,7 @@ class Sub-Test is Test {
         if $.is-ok != ?all(@tests).is-ok {
             @errors.push: "Subtest $usable-number isn't coherent";
         }
-        say "Entries ", @!entries;
         my @plans = @!entries.grep(Plan);
-        say @plans;
         if !@plans {
             @errors.push: "Subtest $usable-number doesn't have a plan";
         }
