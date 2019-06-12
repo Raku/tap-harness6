@@ -92,7 +92,6 @@ ok 2 -
     ok 2 - plain url string with explicit protocol
     ok 3 - type name input
     ok 4 - routine name input
-stuff
     ok 5 - identifier (sub) input
     ok 6 - operator input
     ok 7 - sigil/twigil input
@@ -105,7 +104,7 @@ ok 4 - footer-html
 ok 5 - svg-for-file
 END
 
-parse-and-get($content6,:tests-planned(5), :tests-run(5), :passed(5), :failed(0), :todo-passed(0), :skipped(0), :unknowns(6), :errors());
+parse-and-get($content6,:tests-planned(5), :tests-run(5), :passed(5), :failed(0), :todo-passed(0), :skipped(0), :unknowns(0), :errors());
 
 done-testing();
 
