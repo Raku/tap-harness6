@@ -1,7 +1,9 @@
-branches:
-sudo: false
-language: perl6
-perl6:
-  - latest
-script:
-  - PERL6LIB=lib perl6 -MTAP -e 'exit(TAP::Harness.new.run(@*ARGS).result.has-errors)' t/*.t
+language: minimal
+
+services:
+  - docker
+
+install:
+  - docker pull jjmerelo/test-perl6
+
+script: docker run -t -v  $TRAVIS_BUILD_DIR:/test jjmerelo/test-perl6
