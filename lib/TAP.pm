@@ -16,24 +16,15 @@ class Plan does Entry {
 
 enum Directive <No-Directive Skip Todo>;
 
-class Comment does Entry {
-    has Str:D $.comment is required;
-}
-
 class Test does Entry {
     has Bool:D $.ok is required;
     has Int $.number;
     has Str $.description;
     has Directive:D $.directive = No-Directive;
     has Str $.explanation;
-    has @.comments;
 
     method is-ok() {
         $!ok || $!directive ~~ Todo;
-    }
-
-    method add-comment(TAP::Comment:D $comment) {
-        @!comments.push: $comment
     }
 }
 
@@ -62,6 +53,9 @@ class Sub-Test is Test {
 
 class Bailout does Entry {
     has Str $.explanation;
+}
+class Comment does Entry {
+    has Str:D $.comment is required;
 }
 class YAML does Entry {
     has Str:D $.serialized is required;
@@ -93,7 +87,6 @@ class Result {
     has Int $.tests-run;
     has Int $.passed;
     has Int @.failed;
-    has TAP::Test @.bad-tests,
     has Str @.errors;
     has Int $.actual-passed;
     has Int $.actual-failed;
@@ -205,7 +198,7 @@ my grammar Grammar {
         :i 'TAP version ' <version=.num>
     }
     token comment {
-        '#' $<comment>=[ <.sp>* \N*]
+        '#' <.sp>* $<comment>=[\N*]
     }
     token yaml(Int $indent = 0) {
         '  ---' \n
@@ -364,7 +357,7 @@ my sub parser(Supply $input --> Supply) {
     }
 }
 
-enum Formatter::Volume <Silent Quiet Normal Detailed Verbose>;
+enum Formatter::Volume <Silent Quiet Normal Verbose>;
 role Formatter {
     has Bool:D $.timer = False;
     has Formatter::Volume $.volume = Normal;
@@ -425,14 +418,6 @@ class Formatter::Text does Formatter {
 
                     if $result.failed -> @failed {
                         $output ~= self.format-failure('  Failed tests:  ' ~ @failed.join(' ') ~ "\n");
-                    }
-                    if $result.bad-tests -> @bad-tests {
-                        $output ~= self.format-failure(
-                            @bad-tests.map( {
-                                .number ~ " - " ~ .description,
-                                .comments.map( "#" ~ *.comment )
-                            } ).flat.map( "  " ~ * ~ "\n" ).join('')
-                        )
                     }
                     if $result.todo-passed -> @todo-passed {
                         $output ~= "  TODO passed:  { @todo-passed.join(' ') }\n";
@@ -668,7 +653,6 @@ my class State does TAP::Entry::Handler {
     has Int $!tests-run = 0;
     has Int $!passed = 0;
     has Int @!failed;
-    has TAP::Test @!bad-tests;
     has Str @!errors;
     has Int $!actual-passed = 0;
     has Int $!actual-failed = 0;
@@ -685,8 +669,6 @@ my class State does TAP::Entry::Handler {
     has Promise $.done = Promise.new;
     has Int $!version;
     has Bool $.loose;
-
-    has TAP::Test $!last-test;
 
     proto method handle-entry(TAP::Entry $entry) {
         if $!seen-plan == After && $entry !~~ TAP::Comment {
@@ -717,7 +699,6 @@ my class State does TAP::Entry::Handler {
         }
     }
     multi method handle-entry(TAP::Test $test) {
-        $!last-test = $test;
         my $found-number = $test.number;
         my $expected-number = ++$!tests-run;
         if $found-number.defined && ($found-number != $expected-number) {
@@ -733,7 +714,6 @@ my class State does TAP::Entry::Handler {
         }
         else {
             @!failed.push($usable-number);
-            @!bad-tests.push($test);
         }
         ($test.ok ?? $!actual-passed !! $!actual-failed)++;
         $!todo++ if $test.directive == TAP::Todo;
@@ -744,11 +724,6 @@ my class State does TAP::Entry::Handler {
             for $test.inconsistencies(~$usable-number) -> $error {
                 self!add-error($error);
             }
-        }
-    }
-    multi method handle-entry(TAP::Comment $comment) {
-        with $!last-test {
-            .add-comment: $comment;
         }
     }
     multi method handle-entry(TAP::Bailout $entry) {
@@ -775,7 +750,7 @@ my class State does TAP::Entry::Handler {
         $!done.keep;
     }
     method finalize(Str $name, Proc $exit-status, Duration $time) {
-        TAP::Result.new(:$name, :$!tests-planned, :$!tests-run, :$!passed, :@!failed, :@!bad-tests, :@!errors, :$!skip-all,
+        TAP::Result.new(:$name, :$!tests-planned, :$!tests-run, :$!passed, :@!failed, :@!errors, :$!skip-all,
             :$!actual-passed, :$!actual-failed, :$!todo, :@!todo-passed, :$!skipped, :$!unknowns, :$exit-status, :$time);
     }
     method !add-error(Str $error) {
@@ -831,7 +806,7 @@ class Async {
 
     multi get_runner(Source::Proc $proc) {
         my $async = Proc::Async.new($proc.path, $proc.args);
-        my $source;
+        my $events = parser($async.stdout);
         state $devnull;
         END { $devnull.close with $devnull }
         given $proc.err {
@@ -839,10 +814,9 @@ class Async {
             when 'stderr' { #default is correct
             }
             when 'merge' {
-                $source = $async.Supply;
-                # warn "Merging isn't supported yet on Asynchronous streams";
-                # $devnull //= open($*SPEC.devnull, :w);
-                # $async.bind-stderr($devnull);
+                warn "Merging isn't supported yet on Asynchronous streams";
+                $devnull //= open($*SPEC.devnull, :w);
+                $async.bind-stderr($devnull);
             }
             when 'ignore' {
                 $devnull //= open($*SPEC.devnull, :w);
@@ -858,7 +832,6 @@ class Async {
                 die "Unknown error handler";
             }
         }
-        my $events = parser($source // $async.stdout);
         my $process = $async.start;
         my $start-time = now;
         my $timer = $process.then({ now - $start-time });
@@ -923,7 +896,7 @@ class Harness {
 
     has SourceHandler @.handlers = SourceHandler::Perl6.new();
     has IO::Handle $.handle = $*OUT;
-    has Formatter::Volume $.volume = ?%*ENV<HARNESS_VERBOSE> ?? Verbose !! (?%*ENV<HARNESS_DETAILED> ?? Detailed !! Normal);
+    has Formatter::Volume $.volume = ?%*ENV<HARNESS_VERBOSE> ?? Verbose !! Normal;
     has TAP::Reporter:U $.reporter-class = $!handle.t && $!volume < Verbose ?? TAP::Reporter::Console !! TAP::Reporter::Text;
     has Str %!env-options = (%*ENV<HARNESS_OPTIONS> // '').split(':').grep(*.chars).map: { / ^ (.) (.*) $ /; ~$0 => val(~$1) };
     has Int:D $.jobs = %!env-options<j> // 1;
