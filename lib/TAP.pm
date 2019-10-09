@@ -897,11 +897,19 @@ class Harness {
         }
     }
 
+    my sub load-reporter(Str $name --> Reporter) {
+        my $classname = $name.subst('-', '::', :g);
+        my $loaded = try ::($classname);
+        return $loaded if $loaded !eqv Any;
+        require ::($classname);
+        return ::($classname);
+    }
+
     has SourceHandler @.handlers = SourceHandler::Raku.new();
     has IO::Handle $.handle = $*OUT;
     has Formatter::Volume $.volume = ?%*ENV<HARNESS_VERBOSE> ?? Verbose !! Normal;
-    has TAP::Reporter:U $.reporter-class = $!handle.t && $!volume < Verbose ?? TAP::Reporter::Console !! TAP::Reporter::Text;
     has Str %!env-options = (%*ENV<HARNESS_OPTIONS> // '').split(':').grep(*.chars).map: { / ^ (.) (.*) $ /; ~$0 => val(~$1) };
+    has TAP::Reporter:U $.reporter-class = %!env-options<r> ?? load-reporter(%!env-options<r>) !! $!handle.t && $!volume < Verbose ?? TAP::Reporter::Console !! TAP::Reporter::Text;
     has Int:D $.jobs = %!env-options<j> // 1;
     has Bool:D $.timer = ?%*ENV<HARNESS_TIMER>;
     subset ErrValue where any(IO::Handle:D, Supply, 'stderr', 'ignore', 'merge');
