@@ -32,6 +32,7 @@
      "TAP::Source::Supply"                : "lib/TAP.pm",
      "TAP::Async"                         : "lib/TAP.pm",
      "TAP::Harness"                       : "lib/TAP.pm",
+     "TAP::Harness::SourceHandler::Raku"  : "lib/TAP.pm",
      "TAP::Harness::SourceHandler::Perl6" : "lib/TAP.pm",
      "TAP::Harness::SourceHandler::Exec"  : "lib/TAP.pm"
   },

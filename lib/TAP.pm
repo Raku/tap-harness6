@@ -877,13 +877,16 @@ class Harness {
             TAP::Source::Proc.new(:$name, :$!path, :args[ |@!args, $name ], :$err);
         }
     }
-    class SourceHandler::Perl6 does SourceHandler::Proc {
+    class SourceHandler::Raku does SourceHandler::Proc {
         submethod BUILD(:@incdirs, Str:D :$!path = $*EXECUTABLE.absolute) {
             @!args = @incdirs.map("-I" ~ *);
         }
         method can-handle(Str $name) {
             0.5;
         }
+    }
+    class SourceHandler::Perl6 is SourceHandler::Raku {
+        # This may later give deprecation warnings
     }
     class SourceHandler::Exec does SourceHandler::Proc {
         method new (*@ ($path, *@args)) {
@@ -894,7 +897,7 @@ class Harness {
         }
     }
 
-    has SourceHandler @.handlers = SourceHandler::Perl6.new();
+    has SourceHandler @.handlers = SourceHandler::Raku.new();
     has IO::Handle $.handle = $*OUT;
     has Formatter::Volume $.volume = ?%*ENV<HARNESS_VERBOSE> ?? Verbose !! Normal;
     has TAP::Reporter:U $.reporter-class = $!handle.t && $!volume < Verbose ?? TAP::Reporter::Console !! TAP::Reporter::Text;
