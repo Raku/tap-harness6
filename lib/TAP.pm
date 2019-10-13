@@ -1,6 +1,6 @@
 use v6;
 
-unit module TAP:ver<0.0.9>;
+unit module TAP:ver<0.1.0>;
 
 role Entry {
     has Str:D $.raw is required handles <Str>;
