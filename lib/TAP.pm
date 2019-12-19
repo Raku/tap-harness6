@@ -57,6 +57,9 @@ class Bailout does Entry {
 class Comment does Entry {
     has Str:D $.comment is required;
 }
+class Pragma does Entry {
+    has Bool:D %.identifiers is required;
+}
 class YAML does Entry {
     has Str:D $.serialized is required;
     has Any $.deserialized;
@@ -169,7 +172,7 @@ class Aggregator {
 
 my grammar Grammar {
     regex TOP {
-        ^ [ <plan> | <test> | <bailout> | <version> | <comment> || <unknown> ] $
+        ^ [ <plan> | <test> | <bailout> | <version> | <pragma> | <comment> || <unknown> ] $
     }
     token sp { <[\s] - [\n]> }
     token num { <[0..9]>+ }
@@ -197,6 +200,12 @@ my grammar Grammar {
     token version {
         :i 'TAP version ' <version=.num>
     }
+    token pragma-identifier {
+        $<sign>=<[+-]> $<name>=[<alnum>+]
+    }
+    token pragma {
+        'pragma ' <pragma-identifier>+ % ' '
+    }
     token comment {
         '#' <.sp>* $<comment>=[\N*]
     }
@@ -206,7 +215,7 @@ my grammar Grammar {
         <.indent($indent)> '  ...'
     }
     token sub-entry(Int $indent) {
-        <plan> | <test> | <comment> | <yaml($indent)> | <sub-test($indent)> || <!before <.sp> > <unknown>
+        <plan> | <test> | <comment> | <pragma> | <yaml($indent)> | <sub-test($indent)> || <!before <.sp> > <unknown>
     }
     token indent(Int $indent) {
         '    ' ** { $indent }
@@ -249,6 +258,13 @@ my grammar Grammar {
         }
         method version($/) {
             make TAP::Version.new(:raw(~$/), :version(+$<version>));
+        }
+        method pragma-identifier($/) {
+            make $<name> => ?( $<sign> eq '+' );
+        }
+        method pragma($/) {
+            my Bool:D %identifiers = @<pragma-identifier>.map(*.ast);
+            make TAP::Pragma.new(:raw(~$/), :%identifiers);
         }
         method comment($/) {
             make TAP::Comment.new(:raw(~$/), :comment(~$<comment>));
