@@ -676,7 +676,7 @@ class Reporter::Console does Reporter {
 }
 
 my class State does TAP::Entry::Handler {
-    has Range $.allowed-versions = 12 .. 13;
+    has Range $.allowed-versions = 12 .. 14;
     has Int $!tests-planned;
     has Int $!tests-run = 0;
     has Int $!passed = 0;
