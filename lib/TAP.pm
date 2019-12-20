@@ -309,7 +309,7 @@ my grammar Grammar14 is Grammar13 {
 }
 
 
-my sub parser(Supply $input --> Supply) {
+my sub parser(Supply $input, Int:D $version --> Supply) {
     supply {
         enum Mode <Normal SubTest Yaml >;
         my Mode $mode = Normal;
@@ -334,16 +334,26 @@ my sub parser(Supply $input --> Supply) {
 
         my token indented { ^ '    ' }
 
-        my $grammar = Grammar14.new;
+        state %grammar-for = (
+            12 => Grammar12,
+            13 => Grammar13,
+            14 => Grammar14,
+        );
+
+        my $grammar = %grammar-for{$version}.new orelse die "Unknown version $version";
 
         whenever $input.lines -> $line {
             if $mode == Normal {
-                if $line ~~ / ^ '  ---' / {
+                if $grammar ~~ Grammar13 && $line ~~ / ^ '  ---' / {
                     set-state(Yaml, $line);
-                } elsif $line ~~ &indented {
+                } elsif $grammar ~~ Grammar14 && $line ~~ &indented {
                     set-state(SubTest, $line);
                 } else {
-                    emit-reset $grammar.parse($line);
+                    my $entry = $grammar.parse($line);
+                    emit-reset $entry;
+                    if $entry.made ~~ Version && %grammar-for{$entry.made.version} -> $new-grammar {
+                        $grammar = $new-grammar.new;
+                    }
                 }
             }
             elsif $mode == SubTest {
@@ -840,9 +850,9 @@ class Async {
         $!waiter = Promise.allof($!state.done, $!run.process);
     }
 
-    multi get_runner(Source::Proc $proc) {
+    multi get-runner(Source::Proc $proc, Int $version) {
         my $async = Proc::Async.new($proc.path, $proc.args);
-        my $events = parser($async.stdout);
+        my $events = parser($async.stdout, $version);
         state $devnull;
         END { $devnull.close with $devnull }
         given $proc.err {
@@ -873,25 +883,25 @@ class Async {
         my $timer = $process.then({ now - $start-time });
         Run.new(:$process, :killer($async), :$timer, :$events);
     }
-    multi get_runner(Source::Supply $supply) {
+    multi get-runner(Source::Supply $supply, Int $version) {
         my $start-time = now;
-        my $events = parser($supply.supply);
+        my $events = parser($supply.supply, $version);
         Run.new(:$events);
     }
-    multi get_runner(Source::File $file) {
-        my $events = parser(supply { emit $file.slurp(:close) });
+    multi get-runner(Source::File $file, Int $version) {
+        my $events = parser(supply { emit $file.slurp(:close) }, $version);
         Run.new(:$events);
     }
-    multi get_runner(Source::String $string) {
-        my $events = parser(supply { emit $string.content });
+    multi get-runner(Source::String $string, Int $version) {
+        my $events = parser(supply { emit $string.content }, $version);
         Run.new(:$events);
     }
 
-    method new(Source :$source, Promise :$bailout, Bool :$loose) {
+    method new(Source :$source, Promise :$bailout, Bool :$loose, Int:D :$version = 12) {
         my $state = State.new(:$bailout, :$loose);
-        my $run = get_runner($source);
+        my $run = get-runner($source, $version);
         $state.listen($run.events);
-        Async.bless(:name($source.name), :$state, :$run);
+        self.bless(:name($source.name), :$state, :$run);
     }
 
     has TAP::Result $!result;
@@ -954,6 +964,7 @@ class Harness {
     has SourceHandler @.handlers = SourceHandler::Raku.new();
     has IO::Handle $.handle = $*OUT;
     has OutVal $.output = $!handle;
+    has Int:D $.version = 12;
     has Formatter::Volume $.volume = ?%*ENV<HARNESS_VERBOSE> ?? Verbose !! Normal;
     has Str %!env-options = (%*ENV<HARNESS_OPTIONS> // '').split(':').grep(*.chars).map: { / ^ (.) (.*) $ /; ~$0 => val(~$1) };
     has TAP::Reporter:U $.reporter-class;
@@ -1041,7 +1052,7 @@ class Harness {
                     my $path = normalize-path($name, $cwd);
                     my $session = $reporter.open-test($path);
                     my $source = @!handlers.max(*.can-handle($name)).make-source($path, :$err, :$cwd, |%handler-args);
-                    my $parser = TAP::Async.new(:$source, :$bailout, :$!loose);
+                    my $parser = TAP::Async.new(:$source, :$bailout, :$!loose, :$!version);
                     $session.listen($parser.events);
                     self.add-handlers($parser.events, $output);
                     @working.push({ :$parser, :$session, :done($parser.waiter) });

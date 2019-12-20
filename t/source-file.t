@@ -7,7 +7,7 @@ plan 6;
 
 my $filename = $*PROGRAM.parent.child('source-file-test-data');
 my $source = TAP::Source::File.new(:$filename);
-my $parser = TAP::Async.new(:$source);
+my $parser = TAP::Async.new(:$source, :12version);
 await $parser.waiter;
 my $result = $parser.result;
 
