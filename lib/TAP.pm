@@ -689,6 +689,7 @@ my class State does TAP::Entry::Handler {
     has Int $!skipped = 0;
     has Int $!unknowns = 0;
     has Bool $!skip-all = False;
+    has Bool $!strict;
 
     has Promise $.bailout;
     has Int $!seen-lines = 0;
@@ -764,6 +765,14 @@ my class State does TAP::Entry::Handler {
     }
     multi method handle-entry(TAP::Unknown $) {
         $!unknowns++;
+        if $!strict {
+            self!add-error('Seen invalid TAP in strict mode');
+        }
+    }
+    multi method handle-entry(TAP::Pragma $entry) {
+        if $entry.identifiers<strict>:exists {
+            $!strict = $entry.identifiers<strict>;
+        }
     }
     multi method handle-entry(TAP::Entry $entry) {
     }
