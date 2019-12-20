@@ -107,11 +107,11 @@ class Result {
         $!exit-status.defined ?? ($!exit-status.exitcode +< 8) +| $!exit-status.signal !! Int;
     }
 
-    method has-problems($ignore-exit) {
-        @!failed || @!errors || (!$ignore-exit && self.exit-failed);
+    method has-problems($ignore-exit = False) {
+        so @!failed || @!errors || (!$ignore-exit && self.exit-failed);
     }
     method exit-failed() {
-        $!exit-status.defined && ($!exit-status.exitcode || $!exit-status.signal);
+        so $!exit-status.defined && ($!exit-status.exitcode || $!exit-status.signal);
     }
 }
 
@@ -160,10 +160,10 @@ class Aggregator {
 
 
     method has-problems() {
-        $!todo-passed || self.has-errors;
+        so $!todo-passed || self.has-errors;
     }
     method has-errors() {
-        $!failed + $!errors + $!exit-failed;
+        so $!failed + $!errors + $!exit-failed;
     }
     method get-status() {
         self.has-errors || $!tests-run != $!passed ?? 'FAILED' !! $!tests-run ?? 'PASS' !! 'NOTESTS';
