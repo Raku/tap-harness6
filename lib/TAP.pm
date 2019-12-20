@@ -163,11 +163,13 @@ class Aggregator {
 
 my grammar Grammar {
     regex TOP {
-        ^ [ <plan> | <test> | <bailout> | <version> | <pragma> | <comment> || <unknown> ] $
+        ^ [ <element> || <unknown> ] $
     }
+    proto token element { * }
+
     token sp { <[\s] - [\n]> }
     token num { <[0..9]>+ }
-    token plan {
+    token element:<plan> {
         '1..' <count=.num> <.sp>* [
             '#' <.sp>* $<directive>=[:i 'SKIP'] \S*
             [ <.sp>+ $<explanation>=[\N*] ]?
@@ -176,7 +178,7 @@ my grammar Grammar {
     regex description {
         [ '\\\\' || '\#' || <-[\n#]> ]+ <!after <sp>+>
     }
-    token test {
+    token element:<test> {
         $<nok>=['not '?] 'ok' [ <.sp> <num> ]? ' -'?
             [ <.sp>* <description> ]?
             [
@@ -185,19 +187,19 @@ my grammar Grammar {
             ]?
             <.sp>*
     }
-    token bailout {
+    token element:<bailout> {
         'Bail out!' [ <.sp> $<explanation>=[\N*] ]?
     }
-    token version {
+    token element:<version> {
         :i 'TAP version ' <version=.num>
     }
     token pragma-identifier {
         $<sign>=<[+-]> $<name>=[<alnum>+]
     }
-    token pragma {
+    token element:<pragma> {
         'pragma ' <pragma-identifier>+ % ' '
     }
-    token comment {
+    token element:<comment> {
         '#' <.sp>* $<comment>=[\N*]
     }
     token yaml(Int $indent = 0) {
@@ -206,7 +208,7 @@ my grammar Grammar {
         <.indent($indent)> '  ...'
     }
     token sub-entry(Int $indent) {
-        <plan> | <test> | <comment> | <pragma> | <yaml($indent)> | <sub-test($indent)> || <!before <.sp> > <unknown>
+        <element:<plan>> | <element:<test>> | <element:<comment>> | <element:<pragma>> | <yaml($indent)> | <sub-test($indent)> || <!before <.sp> > <unknown>
     }
     token indent(Int $indent) {
         '    ' ** { $indent }
@@ -214,7 +216,7 @@ my grammar Grammar {
     token sub-test(Int $indent = 0) {
         '    '
         [ <sub-entry($indent + 1)> \n ]+ % [ <.indent($indent+1)> ]
-        <.indent($indent)> <test>
+        <.indent($indent)> <test=element:<test>>
     }
     token unknown {
         \N*
@@ -223,7 +225,7 @@ my grammar Grammar {
         method TOP($/) {
             make $/.values[0].made;
         }
-        method plan($/) {
+        method element:<plan>($/) {
             my %args = :raw(~$/), :tests(+$<count>);
             if $<directive> {
                 %args<skip-all explanation> = True, ~$<explanation>;
@@ -241,23 +243,23 @@ my grammar Grammar {
             %args<explanation> = ~$<explanation> if $<explanation>;
             %args;
         }
-        method test($/) {
+        method element:<test>($/) {
             make TAP::Test.new(:raw(~$/), |self!make_test($/));
         }
-        method bailout($/) {
+        method element:<bailout>($/) {
             make TAP::Bailout.new(:raw(~$/), :explanation($<explanation> ?? ~$<explanation> !! Str));
         }
-        method version($/) {
+        method element:<version>($/) {
             make TAP::Version.new(:raw(~$/), :version(+$<version>));
         }
         method pragma-identifier($/) {
             make $<name> => ?( $<sign> eq '+' );
         }
-        method pragma($/) {
+        method element:<pragma>($/) {
             my Bool:D %identifiers = @<pragma-identifier>.map(*.ast);
             make TAP::Pragma.new(:raw(~$/), :%identifiers);
         }
-        method comment($/) {
+        method element:<comment>($/) {
             make TAP::Comment.new(:raw(~$/), :comment(~$<comment>));
         }
         method yaml($/) {
@@ -325,7 +327,7 @@ my sub parser(Supply $input --> Supply) {
             elsif $mode == SubTest {
                 if $line ~~ &indented {
                     @buffer.push: $line;
-                } elsif $grammar.parse($line, :rule('test')) -> $test {
+                } elsif $grammar.parse($line, :rule('element:<test>')) -> $test {
                     my $raw = (|@buffer, $line).join("\n");
                     if $grammar.parse($raw, :rule('sub-test')) -> $subtest {
                         emit-reset $subtest;
