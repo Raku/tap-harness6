@@ -161,7 +161,7 @@ class Aggregator {
     }
 }
 
-my grammar Grammar {
+my grammar Grammar12 {
     regex TOP {
         ^ [ <element> || <unknown> ] $
     }
@@ -193,30 +193,8 @@ my grammar Grammar {
     token element:<version> {
         :i 'TAP version ' <version=.num>
     }
-    token pragma-identifier {
-        $<sign>=<[+-]> $<name>=[<alnum>+]
-    }
-    token element:<pragma> {
-        'pragma ' <pragma-identifier>+ % ' '
-    }
     token element:<comment> {
         '#' <.sp>* $<comment>=[\N*]
-    }
-    token yaml(Int $indent = 0) {
-        '  ---' \n
-        [ ^^ <.indent($indent)> '  ' $<yaml-line>=[<!before '...'> \N* \n] ]*
-        <.indent($indent)> '  ...'
-    }
-    token sub-entry(Int $indent) {
-        <element:<plan>> | <element:<test>> | <element:<comment>> | <element:<pragma>> | <yaml($indent)> | <sub-test($indent)> || <!before <.sp> > <unknown>
-    }
-    token indent(Int $indent) {
-        '    ' ** { $indent }
-    }
-    token sub-test(Int $indent = 0) {
-        '    '
-        [ <sub-entry($indent + 1)> \n ]+ % [ <.indent($indent+1)> ]
-        <.indent($indent)> <test=element:<test>>
     }
     token unknown {
         \N*
@@ -235,7 +213,7 @@ my grammar Grammar {
         method description($m) {
             $m.make: ~$m.subst(/\\('#'|'\\')/, { $_[0] }, :g)
         }
-        method !make_test($/) {
+        method make-test($/) {
             my %args = (:ok($<nok> eq ''));
             %args<number> = $<num> ?? +$<num> !! Int;
             %args<description> = $<description>.made if $<description>;
@@ -244,14 +222,73 @@ my grammar Grammar {
             %args;
         }
         method element:<test>($/) {
-            make TAP::Test.new(:raw(~$/), |self!make_test($/));
+            make TAP::Test.new(:raw(~$/), |self.make-test($/));
         }
         method element:<bailout>($/) {
-            make TAP::Bailout.new(:raw(~$/), :explanation($<explanation> ?? ~$<explanation> !! Str));
+            my $explanation = $<explanation> ?? ~$<explanation> !! Str;
+            make TAP::Bailout.new(:raw(~$/), :$explanation);
         }
         method element:<version>($/) {
             make TAP::Version.new(:raw(~$/), :version(+$<version>));
         }
+        method element:<comment>($/) {
+            make TAP::Comment.new(:raw(~$/), :comment(~$<comment>));
+        }
+        method unknown($/) {
+            make TAP::Unknown.new(:raw(~$/));
+        }
+    }
+    method actions {
+        Actions
+    }
+    method parse(|c) {
+        nextwith(:actions(self.actions), |c);
+    }
+    method subparse(|c) {
+        nextwith(:actions(self.actions), |c);
+    }
+}
+
+my grammar Grammar13 is Grammar12 {
+    token yaml(Int $indent = 0) {
+        '  ---' \n
+        [ ^^ <.indent($indent)> '  ' $<yaml-line>=[<!before '...'> \N* \n] ]*
+        <.indent($indent)> '  ...'
+    }
+
+    class Actions is Grammar12::Actions {
+        method yaml($/) {
+            my $serialized = $<yaml-line>.join('');
+            my $deserialized = try (require YAMLish) ?? YAMLish::load-yaml("---\n$serialized...") !! Any;
+            make TAP::YAML.new(:raw(~$/), :$serialized, :$deserialized);
+        }
+    }
+    method actions {
+        Actions
+    }
+}
+
+my grammar Grammar14 is Grammar13 {
+    token pragma-identifier {
+        $<sign>=<[+-]> $<name>=[<alnum>+]
+    }
+    token element:<pragma> {
+        'pragma ' <pragma-identifier>+ % ' '
+    }
+
+    token sub-entry(Int $indent) {
+        <element:<plan>> | <element:<test>> | <element:<comment>> | <element:<pragma>> | <yaml($indent)> | <sub-test($indent)> || <!before <.sp> > <unknown>
+    }
+    token indent(Int $indent) {
+        '    ' ** { $indent }
+    }
+    token sub-test(Int $indent = 0) {
+        '    '
+        [ <sub-entry($indent + 1)> \n ]+ % [ <.indent($indent+1)> ]
+        <.indent($indent)> <test=element:<test>>
+    }
+
+    class Actions is Grammar13::Actions {
         method pragma-identifier($/) {
             make $<name> => ?( $<sign> eq '+' );
         }
@@ -259,33 +296,18 @@ my grammar Grammar {
             my Bool:D %identifiers = @<pragma-identifier>.map(*.ast);
             make TAP::Pragma.new(:raw(~$/), :%identifiers);
         }
-        method element:<comment>($/) {
-            make TAP::Comment.new(:raw(~$/), :comment(~$<comment>));
-        }
-        method yaml($/) {
-            my $serialized = $<yaml-line>.join('');
-            my $deserialized = try (require YAMLish) ?? YAMLish::load-yaml("---\n$serialized...") !! Any;
-            make TAP::YAML.new(:raw(~$/), :$serialized, :$deserialized);
-        }
         method sub-entry($/) {
             make $/.values[0].made;
         }
         method sub-test($/) {
-            make TAP::Sub-Test.new(:raw(~$/), :entries(@<sub-entry>».made), |self!make_test($<test>));
-        }
-        method unknown($/) {
-            make TAP::Unknown.new(:raw(~$/));
+            make TAP::Sub-Test.new(:raw(~$/), :entries(@<sub-entry>».made), |self.make-test($<test>));
         }
     }
-    method parse(|c) {
-        my $*tap-indent = 0;
-        nextwith(:actions(Actions), |c);
-    }
-    method subparse(|c) {
-        my $*tap-indent = 0;
-        nextwith(:actions(Actions), |c);
+    method actions {
+        Actions
     }
 }
+
 
 my sub parser(Supply $input --> Supply) {
     supply {
@@ -312,7 +334,7 @@ my sub parser(Supply $input --> Supply) {
 
         my token indented { ^ '    ' }
 
-        my $grammar = Grammar.new;
+        my $grammar = Grammar14.new;
 
         whenever $input.lines -> $line {
             if $mode == Normal {
