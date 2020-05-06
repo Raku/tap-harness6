@@ -85,14 +85,14 @@ It accepts an optional hash whose allowed keys are:
   Possible values: `True` `False`
 * `handlers`
 
-  Default value: `TAP::Harness::SourceHandler::Perl6`
+  Default value: `TAP::Harness::SourceHandler::Raku`
 
-  Possible values: `TAP::Harness::SourceHandler::Perl6`
+  Possible values: `TAP::Harness::SourceHandler::Raku`
   `TAP::Harness::SourceHandler::Exec`
 
   |Language|Handler                                          |
   |--------|-------------------------------------------------|
-  |Raku    |`TAP::Harness::SourceHandler::Perl6.new`         |
+  |Raku    |`TAP::Harness::SourceHandler::Raku.new`         |
   |Perl 5  |`TAP::Harness::SourceHandler::Exec.new('perl')`  |
   |Ruby    |`TAP::Harness::SourceHandler::Exec.new('ruby')`  |
   |Python  |`TAP::Harness::SourceHandler::Exec.new('python')`|
