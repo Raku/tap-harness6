@@ -4,7 +4,7 @@ TAP::Harness
 
 # DESCRIPTION
 
-An asynchronous TAP framework written in Perl 6.
+An asynchronous TAP framework written in Raku.
 
 # prove6
 
@@ -15,7 +15,7 @@ For a detailed documentation on how to use `prove6` [click here](https://github.
 
 # SYNOPSIS
 
-```Perl 6
+```Raku
 use TAP::Harness;
 my $harness = TAP::Harness.new(|%args);
 $harness.run(@tests);
@@ -27,7 +27,7 @@ $harness.run(@tests);
 
 ### new
 
-```Perl 6
+```Raku
 my %args = jobs => 1, err  => 'ignore';
 my $harness = TAP::Harness.new( |%args );
 ```
@@ -92,7 +92,7 @@ It accepts an optional hash whose allowed keys are:
 
   |Language|Handler                                          |
   |--------|-------------------------------------------------|
-  |Perl 6  |`TAP::Harness::SourceHandler::Perl6.new`         |
+  |Raku    |`TAP::Harness::SourceHandler::Perl6.new`         |
   |Perl 5  |`TAP::Harness::SourceHandler::Exec.new('perl')`  |
   |Ruby    |`TAP::Harness::SourceHandler::Exec.new('ruby')`  |
   |Python  |`TAP::Harness::SourceHandler::Exec.new('python')`|
@@ -101,7 +101,7 @@ It accepts an optional hash whose allowed keys are:
 
 ### run
 
-```Perl 6
+```Raku
 $harness.run(@tests);
 ```
 
