@@ -32,6 +32,7 @@
      "TAP::Source::Supply"                : "lib/TAP.pm",
      "TAP::Async"                         : "lib/TAP.pm",
      "TAP::Harness"                       : "lib/TAP.pm",
+     "TAP::Harness::SourceHandler::Raku"  : "lib/TAP.pm",
      "TAP::Harness::SourceHandler::Perl6" : "lib/TAP.pm",
      "TAP::Harness::SourceHandler::Exec"  : "lib/TAP.pm"
   },
@@ -39,5 +40,5 @@
   "source-url" : "git://github.com/perl6/tap-harness6.git",
   "tags" : [ ],
   "test-depends" : [ ],
-  "version" : "0.0.8"
+  "version" : "0.1.0"
 }

@@ -1,6 +1,6 @@
 use v6;
 
-unit module TAP:ver<0.0.8>;
+unit module TAP:ver<0.1.0>;
 
 role Entry {
     has Str:D $.raw is required handles <Str>;
@@ -357,7 +357,7 @@ my sub parser(Supply $input --> Supply) {
     }
 }
 
-enum Formatter::Volume <Silent ReallyQuiet Quiet Normal Verbose>;
+enum Formatter::Volume <Silent Quiet Normal Verbose>;
 role Formatter {
     has Bool:D $.timer = False;
     has Formatter::Volume $.volume = Normal;
@@ -386,7 +386,7 @@ class Reporter::Text::Session does Session {
 class Formatter::Text does Formatter {
     has Int $!longest;
 
-    submethod BUILD(:@names) {
+    submethod TWEAK(:@names) {
         $!longest = @names ?? @names».chars.max !! 12;
     }
     method format-name($name) {
@@ -468,7 +468,7 @@ class Formatter::Text does Formatter {
         $output;
     }
     method format-test-failure(Str $name, TAP::Result $result) {
-        return if self.volume < Quiet;
+        return if self.volume <= Quiet;
         my $output = self.format-return("$name ");
 
         my $total = $result.tests-planned // $result.tests-run;
@@ -505,7 +505,7 @@ class Formatter::Text does Formatter {
 }
 class Reporter::Text does Reporter {
     has IO::Handle $!handle;
-    has Formatter::Text $!formatter;
+    has Formatter::Text $!formatter handles <volume>;
 
     submethod BUILD(:@names, :$!handle = $*OUT, :$volume = Normal, :$timer = False, Bool :$ignore-exit) {
         $!formatter = Formatter::Text.new(:@names, :$volume, :$timer, :$ignore-exit);
@@ -516,21 +516,21 @@ class Reporter::Text does Reporter {
         Reporter::Text::Session.new(:$name, :$header, :reporter(self));
     }
     method summarize(TAP::Aggregator $aggregator, Bool $interrupted, Duration $duration) {
-        self!output($!formatter.format-summary($aggregator, $interrupted, $duration));
+        self!output($!formatter.format-summary($aggregator, $interrupted, $duration)) unless self.volume === Silent;
     }
     method !output(Any $value) {
         $!handle.print($value);
     }
     method print-result(Reporter::Text::Session $session, TAP::Result $report) {
-        self!output($!formatter.format-result($session, $report));
+        self!output($!formatter.format-result($session, $report)) unless self.volume <= Quiet;
     }
 }
 
 class Formatter::Console is Formatter::Text {
     has $.color;
-	has &colored = $!color && (try require Terminal::ANSIColor) !=== Nil
-		?? ::('Terminal::ANSIColor::EXPORT::DEFAULT::&colored')
-		!! sub ($text, $) { $text };
+    has &colored = $!color && (try require Terminal::ANSIColor) !=== Nil
+        ?? ::('Terminal::ANSIColor::EXPORT::DEFAULT::&colored')
+        !! sub ($text, $) { $text };
     method format-success(Str $output) {
         &colored($output, 'green');
     }
@@ -571,7 +571,7 @@ class Reporter::Console::Session does Session {
     }
 }
 class Reporter::Console does Reporter {
-    has Formatter::Console $!formatter;
+    has Formatter::Console $!formatter handles <volume>;
     has Int $!lastlength;
     has Supplier $events;
     has Reporter::Console::Session @!active;
@@ -592,7 +592,6 @@ class Reporter::Console does Reporter {
             my $new-now = now;
             return if $now == $new-now and !$refresh;
             $now = $new-now;
-            return if $!formatter.volume < Quiet;
             my $header = sprintf '===( %7d;%d', $!tests, $now - $start;
             my @items = @!active.map(*.summary);
             my $ruler = ($header, |@items).join('  ') ~ ')===';
@@ -600,6 +599,7 @@ class Reporter::Console does Reporter {
             $handle.print($!formatter.format-return($ruler));
         }
         multi receive('update', Str $name, Str $header, Int $number, Int $plan) {
+            return if self.volume <= Quiet;
             if @!active.elems == 1 {
                 my $status = ($header, $number, '/', $plan // '?').join('');
                 $handle.print($!formatter.format-return($status));
@@ -610,15 +610,17 @@ class Reporter::Console does Reporter {
             }
         }
         multi receive('bailout', Str $explanation) {
+            return if self.volume <= Quiet;
             $handle.print($!formatter.format-failure("Bailout called.  Further testing stopped: $explanation\n"));
         }
         multi receive('result', Reporter::Console::Session $session, TAP::Result $result) {
+            return if self.volume <= Quiet;
             $handle.print($!formatter.format-return(' ' x $!lastlength) ~ $!formatter.format-result($session, $result));
             @!active = @!active.grep(* !=== $session);
             output-ruler(True) if @!active.elems > 1;
         }
         multi receive('summary', TAP::Aggregator $aggregator, Bool $interrupted, Duration $duration) {
-            $handle.print($!formatter.format-summary($aggregator, $interrupted, $duration));
+            $handle.print($!formatter.format-summary($aggregator, $interrupted, $duration)) unless self.volume == Silent;
         }
 
         $!events.Supply.act(-> @args { receive(|@args) });
@@ -875,13 +877,16 @@ class Harness {
             TAP::Source::Proc.new(:$name, :$!path, :args[ |@!args, $name ], :$err);
         }
     }
-    class SourceHandler::Perl6 does SourceHandler::Proc {
+    class SourceHandler::Raku does SourceHandler::Proc {
         submethod BUILD(:@incdirs, Str:D :$!path = $*EXECUTABLE.absolute) {
             @!args = @incdirs.map("-I" ~ *);
         }
         method can-handle(Str $name) {
             0.5;
         }
+    }
+    class SourceHandler::Perl6 is SourceHandler::Raku {
+        # This may later give deprecation warnings
     }
     class SourceHandler::Exec does SourceHandler::Proc {
         method new (*@ ($path, *@args)) {
@@ -892,11 +897,19 @@ class Harness {
         }
     }
 
-    has SourceHandler @.handlers = SourceHandler::Perl6.new();
+    my sub load-reporter(Str $name --> Reporter) {
+        my $classname = $name.subst('-', '::', :g);
+        my $loaded = try ::($classname);
+        return $loaded if $loaded !eqv Any;
+        require ::($classname);
+        return ::($classname);
+    }
+
+    has SourceHandler @.handlers = SourceHandler::Raku.new();
     has IO::Handle $.handle = $*OUT;
     has Formatter::Volume $.volume = ?%*ENV<HARNESS_VERBOSE> ?? Verbose !! Normal;
-    has TAP::Reporter:U $.reporter-class = $!handle.t && $!volume < Verbose ?? TAP::Reporter::Console !! TAP::Reporter::Text;
     has Str %!env-options = (%*ENV<HARNESS_OPTIONS> // '').split(':').grep(*.chars).map: { / ^ (.) (.*) $ /; ~$0 => val(~$1) };
+    has TAP::Reporter:U $.reporter-class = %!env-options<r> ?? load-reporter(%!env-options<r>) !! $!handle.t && $!volume < Verbose ?? TAP::Reporter::Console !! TAP::Reporter::Text;
     has Int:D $.jobs = %!env-options<j> // 1;
     has Bool:D $.timer = ?%*ENV<HARNESS_TIMER>;
     subset ErrValue where any(IO::Handle:D, Supply, 'stderr', 'ignore', 'merge');
@@ -982,3 +995,5 @@ class Harness {
         Run.new(:$waiter, :$killed);
     }
 }
+
+# ts=4 sw=4 et

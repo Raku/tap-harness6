@@ -1,4 +1,4 @@
-use TAP;
+use TAP; # -*- mode: perl6 -*- 
 
 use Test;
 
@@ -80,6 +80,31 @@ if try (require YAMLish) {
 	is-deeply(@entries2[2].entries[1].deserialized, [ <Foo Bar> ], 'Could deserialize YAML');
 }
 isa-ok(@entries2[3], TAP::YAML, 'Got YAML again');
+
+my $content6=q:heredoc/END/;
+1..5
+ok 1 - Pod::Htmlify module can be use-d ok
+    1..1
+    ok 1 - :page-order value extracted correctly
+ok 2 - 
+    1..7
+    ok 1 - requires an argument
+    ok 2 - plain url string with explicit protocol
+    ok 3 - type name input
+    ok 4 - routine name input
+    ok 5 - identifier (sub) input
+    ok 6 - operator input
+    ok 7 - sigil/twigil input
+ok 3 - url-munge
+    1..1
+    ok 1 - footer text isn't empty
+ok 4 - footer-html
+    1..1
+    ok 1 - SVG content extracted correctly
+ok 5 - svg-for-file
+END
+
+parse-and-get($content6,:tests-planned(5), :tests-run(5), :passed(5), :failed(0), :todo-passed(0), :skipped(0), :unknowns(0), :errors());
 
 done-testing();
 
