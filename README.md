@@ -6,13 +6,6 @@ TAP::Harness
 
 An asynchronous TAP framework written in Raku.
 
-# prove6
-
-This module provides support for the `prove6` command which runs a TAP based test suite and prints a report. The actual command is in the App::prove6 module.
-The `prove6` command is a minimal wrapper around an instance of this module.
-
-For a detailed documentation on how to use `prove6` [click here](https://github.com/Leont/app-prove6/blob/master/README.md) or run `prove6 --help` (once it's been installed)
-
 # SYNOPSIS
 
 ```Raku
@@ -113,7 +106,6 @@ These features are currently not implemented but are considered desirable:
 
  * Rule based parallel scheduling
  * Source Handlers other than `::Raku`
- * Various `prove6` arguments
  * Better documentation
 
  # LICENSE
