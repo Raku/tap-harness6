@@ -92,7 +92,7 @@ It accepts an optional hash whose allowed keys are:
 
   |Language|Handler                                          |
   |--------|-------------------------------------------------|
-  |Raku    |`TAP::Harness::SourceHandler::Raku.new`         |
+  |Raku    |`TAP::Harness::SourceHandler::Raku.new`          |
   |Perl 5  |`TAP::Harness::SourceHandler::Exec.new('perl')`  |
   |Ruby    |`TAP::Harness::SourceHandler::Exec.new('ruby')`  |
   |Python  |`TAP::Harness::SourceHandler::Exec.new('python')`|
@@ -112,7 +112,7 @@ Accepts an array of `@tests` to be run. This should generally be the names of te
 These features are currently not implemented but are considered desirable:
 
  * Rule based parallel scheduling
- * Source Handlers other than `::Perl6`
+ * Source Handlers other than `::Raku`
  * Various `prove6` arguments
  * Better documentation
 
