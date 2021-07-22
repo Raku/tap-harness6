@@ -101,7 +101,7 @@ class Result {
         $!exit-status.defined ?? $!exit-status.exitcode !! Int;
     }
     method wait() {
-        $!exit-status.defined ?? $!exit-status.status !! Int;
+        $!exit-status.defined ?? ($!exit-status.exitcode +< 8) +| $!exit-status.signal !! Int;
     }
 
     method has-problems($ignore-exit) {
