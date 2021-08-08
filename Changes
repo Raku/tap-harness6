@@ -1,6 +1,8 @@
 Revision history for TAP
 
 {{$NEXT}}
+
+0.2.0  2021-08-08T22:31:06+02:00
         - Move prove6 to App::Prove6
         - Make coloring optional
 

@@ -9,11 +9,11 @@
   "name" : "TAP",
   "perl" : "6.*",
   "provides" : {
-     "TAP"                                : "lib/TAP.pm"
+    "TAP" : "lib/TAP.pm"
   },
   "resources" : [ ],
   "source-url" : "git://github.com/perl6/tap-harness6.git",
   "tags" : [ ],
   "test-depends" : [ ],
-  "version" : "0.1.0"
+  "version" : "0.2.0"
 }
