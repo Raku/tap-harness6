@@ -108,7 +108,7 @@ class Result {
         @!failed || @!errors || (!$ignore-exit && self.exit-failed);
     }
     method exit-failed() {
-        $!exit-status.defined && $!exit-status.status;
+        $!exit-status.defined && ($!exit-status.exitcode || $!exit-status.signal);
     }
 }
 
