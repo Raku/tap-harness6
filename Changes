@@ -1,6 +1,7 @@
 Revision history for TAP
 
 {{$NEXT}}
+        - Make error handle a supplier instead of a supply
 
 0.2.1  2021-08-09T15:30:06+02:00
         - Fix warning in Result.exit-failed()

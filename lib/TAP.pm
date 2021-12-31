@@ -825,7 +825,7 @@ class Async {
             when IO::Handle:D {
                 $async.stderr.lines(:close).act({ $err.say($_) });
             }
-            when Supply:D {
+            when Supplier:D {
                 $async.stderr.act({ $err.emit($_) }, :done({ $err.done }), :quit({ $err.quit($^reason) }));
             }
             default {
@@ -912,7 +912,7 @@ class Harness {
     has TAP::Reporter:U $.reporter-class = %!env-options<r> ?? load-reporter(%!env-options<r>) !! $!handle.t && $!volume < Verbose ?? TAP::Reporter::Console !! TAP::Reporter::Text;
     has Int:D $.jobs = %!env-options<j> // 1;
     has Bool:D $.timer = ?%*ENV<HARNESS_TIMER>;
-    subset ErrValue where any(IO::Handle:D, Supply, 'stderr', 'ignore', 'merge');
+    subset ErrValue where any(IO::Handle:D, Supplier, 'stderr', 'ignore', 'merge');
     has ErrValue $.err = 'stderr';
     has Bool:D $.ignore-exit = ?%*ENV<HARNESS_INGORE_EXIT>;
     has Bool:D $.trap = False;
