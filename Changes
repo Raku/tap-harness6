@@ -1,6 +1,8 @@
 Revision history for TAP
 
 {{$NEXT}}
+
+0.2.2  2021-12-31T01:04:26+01:00
         - Make error handle a supplier instead of a supply
 
 0.2.1  2021-08-09T15:30:06+02:00
