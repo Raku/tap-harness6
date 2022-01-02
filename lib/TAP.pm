@@ -943,17 +943,17 @@ class Harness {
     }
     my &sigint = sub { signal(SIGINT) }
 
-    method run(*@sources) {
+    method run(*@names) {
         my $killed = Promise.new;
         my $aggregator = self.make-aggregator;
-        my $reporter = $!reporter-class.new(:names(@sources), :$!timer, :$!ignore-exit, :$!volume, :$!handle, :$!color);
+        my $reporter = $!reporter-class.new(:@names, :$!timer, :$!ignore-exit, :$!volume, :$!handle, :$!color);
 
         my @working;
         my $waiter = start {
             my $int = $!trap ?? sigint().tap({ $killed.break("Interrupted"); $int.close(); }) !! Tap;
             my $begin = now;
             try {
-                for @sources -> $name {
+                for @names -> $name {
                     my $session = $reporter.open-test($name);
                     my $source = self.make-source($name);
                     my $parser = TAP::Async.new(:$source, :$killed, :$!loose);
@@ -981,10 +981,10 @@ class Harness {
         }
         sub reap-finished() {
             my @new-working;
-            for @working -> $current {
-                if $current<done> {
-                    $aggregator.add-result($current<parser>.result);
-                    $current<session>.close-test($current<parser>.result);
+            for @working -> $current (:$done, :$parser, :$session) {
+                if $done {
+                    $aggregator.add-result($parser.result);
+                    $session.close-test($parser.result);
                 }
                 else {
                     @new-working.push($current);
