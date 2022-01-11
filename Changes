@@ -2,6 +2,9 @@ Revision history for TAP
 
 {{$NEXT}}
 
+0.3.0  2022-01-11T22:18:45+01:00
+        - Allow Supplier as output handle
+
 0.2.2  2021-12-31T01:04:26+01:00
         - Make error handle a supplier instead of a supply
 
