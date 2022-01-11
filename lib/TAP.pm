@@ -376,9 +376,9 @@ class Output::Handle does Output {
 }
 
 class Output::Supplier does Output {
-    has Supplier:D $.supply is required;
+    has Supplier:D $.supplier is required;
     method print(Str $value) {
-        $!supply.emit($value);
+        $!supplier.emit($value);
     }
 }
 
