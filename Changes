@@ -1,6 +1,8 @@
 Revision history for TAP
 
 {{$NEXT}}
+
+0.3.1  2022-01-12T01:00:01+01:00
         - Fix Supplier name in Output::Supplier
 
 0.3.0  2022-01-11T22:18:45+01:00
