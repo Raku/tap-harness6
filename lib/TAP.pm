@@ -808,6 +808,7 @@ class Source::Proc does Source {
     has Str $.path is required;
     has @.args;
     has $.err is required;
+    has $.cwd is required;
 }
 class Source::File does Source {
     has IO(Str) $.filename handles<slurp>;
@@ -857,7 +858,7 @@ class Async {
                 die "Unknown error handler";
             }
         }
-        my $process = $async.start;
+        my $process = $async.start(:cwd($proc.cwd));
         my $start-time = now;
         my $timer = $process.then({ now - $start-time });
         Run.new(:$process, :killer($async), :$timer, :$events);
@@ -898,8 +899,8 @@ class Harness {
     role SourceHandler::Proc does SourceHandler {
         has Str:D $.path is required;
         has @.args;
-        method make-source(Str:D $name, Any:D :$err) {
-            TAP::Source::Proc.new(:$name, :$!path, :args[ |@!args, $name ], :$err);
+        method make-source(Str:D $name, Any:D :$err, IO::Path:D :$cwd!) {
+            TAP::Source::Proc.new(:$name, :$!path, :args[ |@!args, $name ], :$err, :$cwd);
         }
     }
     class SourceHandler::Raku does SourceHandler::Proc {
@@ -953,6 +954,7 @@ class Harness {
     has Bool:D $.loose = $*PERL.compiler.version before 2017.09;
     my @safe-terminals = <xterm eterm vte konsole color>;
     has Bool:D $.color= so %!env-options<c> // %*ENV<HARNESS_COLOR> // !%*ENV<NO_COLOR>.defined && is-terminal($!output) && (%*ENV<TERM> // '') ~~ / @safe-terminals /;
+    has IO::Path:D $.cwd = $*CWD;
 
     class Run {
         has Promise $.waiter handles <result>;
@@ -973,7 +975,7 @@ class Harness {
         }
     }
     method make-source(Str $name) {
-        @!handlers.max(*.can-handle($name)).make-source($name, :$!err);
+        @!handlers.max(*.can-handle($name)).make-source($name, :$!err, :$!cwd);
     }
     my &sigint = sub { signal(SIGINT) }
 
@@ -995,8 +997,9 @@ class Harness {
             my $begin = now;
             try {
                 for @names -> $name {
-                    my $session = $reporter.open-test($name);
-                    my $source = self.make-source($name);
+                    my $path = $name ~~ IO ?? $name.IO.relative($!cwd) !! ~$name;
+                    my $session = $reporter.open-test($path);
+                    my $source = self.make-source($path);
                     my $parser = TAP::Async.new(:$source, :$killed, :$!loose);
                     $session.listen($parser.events);
                     self.add-handlers($parser.events, $output);
