@@ -810,7 +810,7 @@ class Source::Proc does Source {
     has $.err is required;
 }
 class Source::File does Source {
-    has Str $.filename;
+    has IO(Str) $.filename handles<slurp>;
 }
 class Source::String does Source {
     has Str $.content;
@@ -868,7 +868,7 @@ class Async {
         Run.new(:$events);
     }
     multi get_runner(Source::File $file) {
-        my $events = parser(supply { emit $file.filename.IO.slurp(:close) });
+        my $events = parser(supply { emit $file.slurp(:close) });
         Run.new(:$events);
     }
     multi get_runner(Source::String $string) {
