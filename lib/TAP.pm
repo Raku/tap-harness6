@@ -904,7 +904,7 @@ class Harness {
     class SourceHandler::Raku does SourceHandler::Proc {
         has Str:D $.path = $*EXECUTABLE.absolute;
         has Str @.incdirs;
-        method make-source(Str:D $name, Any:D :$err, IO::Path:D :$cwd) {
+        method make-source(Str:D $name, Any:D :$err, IO::Path:D :$cwd, *%) {
             my @args = |@!incdirs.map("-I" ~ *), $name;
             TAP::Source::Proc.new(:$name, :$!path, :@args, :$err, :$cwd);
         }
@@ -921,7 +921,7 @@ class Harness {
         method can-handle(Str $name) {
             1;
         }
-        method make-source(Str:D $name, Any:D :$err, IO::Path:D :$cwd) {
+        method make-source(Str:D $name, Any:D :$err, IO::Path:D :$cwd, *%) {
             my @args = |@!args, $name;
             TAP::Source::Proc.new(:$name, :$!path, :@args, :$err, :$cwd);
         }
@@ -985,7 +985,8 @@ class Harness {
     my multi make-output(Supplier:D $supplier) {
         return Output::Supplier.new(:$supplier);
     }
-    method run(*@names, IO(Str) :$cwd = $*CWD, OutVal :$out = $!output, ErrValue :$err = $!err) {
+
+    method run(*@names, IO(Str) :$cwd = $*CWD, OutVal :$out = $!output, ErrValue :$err = $!err, *%handler-args) {
         my $killed = Promise.new;
         my $aggregator = self.make-aggregator;
         my $output = make-output($out);
@@ -999,7 +1000,7 @@ class Harness {
                 for @names -> $name {
                     my $path = normalize-path($name, $cwd);
                     my $session = $reporter.open-test($path);
-                    my $source = @!handlers.max(*.can-handle($name)).make-source($path, :$err, :$cwd);
+                    my $source = @!handlers.max(*.can-handle($name)).make-source($path, :$err, :$cwd, |%handler-args);
                     my $parser = TAP::Async.new(:$source, :$killed, :$!loose);
                     $session.listen($parser.events);
                     self.add-handlers($parser.events, $output);
