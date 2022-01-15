@@ -898,6 +898,9 @@ class Harness {
     }
     role SourceHandler::Proc does SourceHandler {
     }
+    my sub normalize-path($path, IO::Path $cwd) {
+        $path ~~ IO ?? $path.IO.relative($cwd) !! ~$path
+    }
     class SourceHandler::Raku does SourceHandler::Proc {
         has Str:D $.path = $*EXECUTABLE.absolute;
         has Str @.incdirs;
@@ -994,7 +997,7 @@ class Harness {
             my $begin = now;
             try {
                 for @names -> $name {
-                    my $path = $name ~~ IO ?? $name.IO.relative($cwd) !! ~$name;
+                    my $path = normalize-path($name, $cwd);
                     my $session = $reporter.open-test($path);
                     my $source = @!handlers.max(*.can-handle($name)).make-source($path, :$err, :$cwd);
                     my $parser = TAP::Async.new(:$source, :$killed, :$!loose);
