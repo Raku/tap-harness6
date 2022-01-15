@@ -937,12 +937,6 @@ class Harness {
     }
 
     subset OutVal where any(IO::Handle:D, Supplier:D);
-    my multi is-terminal(IO::Handle:D $out) {
-        return $out.t;
-    }
-    my multi is-terminal(Supplier:D $out) {
-        return False
-    }
 
     has SourceHandler @.handlers = SourceHandler::Raku.new();
     has IO::Handle $.handle = $*OUT;
@@ -958,7 +952,7 @@ class Harness {
     has Bool:D $.trap = False;
     has Bool:D $.loose = $*PERL.compiler.version before 2017.09;
     my @safe-terminals = <xterm eterm vte konsole color>;
-    has Bool:D $.color= so %!env-options<c> // %*ENV<HARNESS_COLOR> // !%*ENV<NO_COLOR>.defined && is-terminal($!output) && (%*ENV<TERM> // '') ~~ / @safe-terminals /;
+    has Bool $.color;
 
     class Run {
         has Promise $.waiter handles <result>;
@@ -992,10 +986,29 @@ class Harness {
             return $reporter-class;
         } elsif %env-options<r> {
             return load-reporter(%env-options<r>);
-        } elsif is-terminal($output) && $volume < Verbose {
+        } elsif $output.terminal && $volume < Verbose {
             return TAP::Reporter::Console;
         } else {
             return TAP::Reporter::Text;
+        }
+    }
+
+    my sub get-color(Bool $color, %env-options, Output $output) {
+        with $color {
+            return $color;
+        }
+        orwith %env-options<c> {
+            return True;
+        }
+        orwith %*ENV<HARNESS_COLOR> {
+            return ?%*ENV<HARNESS_COLOR>;
+        }
+        orwith %*ENV<NO_COLOR> {
+            return False;
+        }
+        else {
+            state @safe-terminals = <xterm eterm vte konsole color>;
+            return $output.terminal && (%*ENV<TERM> // '') ~~ / @safe-terminals /;
         }
     }
 
@@ -1003,8 +1016,9 @@ class Harness {
         my $killed = Promise.new;
         my $aggregator = self.make-aggregator;
         my $output = make-output($out);
-        my $reporter-class = get-reporter($!reporter-class, %!env-options, $out, $!volume);
-        my $reporter = $reporter-class.new(:@names, :$!timer, :$!ignore-exit, :$!volume, :$output, :$!color);
+        my $reporter-class = get-reporter($!reporter-class, %!env-options, $output, $!volume);
+        my $color = get-color($!color, %!env-options, $output);
+        my $reporter = $reporter-class.new(:@names, :$!timer, :$!ignore-exit, :$!volume, :$output, :$color);
 
         my @working;
         my $waiter = start {
