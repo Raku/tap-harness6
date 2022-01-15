@@ -1,6 +1,7 @@
 Revision history for TAP
 
 {{$NEXT}}
+        - Add a cwd attribute to TAP::Harness
 
 0.3.1  2022-01-12T01:00:01+01:00
         - Fix Supplier name in Output::Supplier
