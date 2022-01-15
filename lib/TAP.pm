@@ -949,7 +949,7 @@ class Harness {
     has OutVal $.output = $!handle;
     has Formatter::Volume $.volume = ?%*ENV<HARNESS_VERBOSE> ?? Verbose !! Normal;
     has Str %!env-options = (%*ENV<HARNESS_OPTIONS> // '').split(':').grep(*.chars).map: { / ^ (.) (.*) $ /; ~$0 => val(~$1) };
-    has TAP::Reporter:U $.reporter-class = %!env-options<r> ?? load-reporter(%!env-options<r>) !! is-terminal($!output) && $!volume < Verbose ?? TAP::Reporter::Console !! TAP::Reporter::Text;
+    has TAP::Reporter:U $.reporter-class;
     has Int:D $.jobs = %!env-options<j> // 1;
     has Bool:D $.timer = ?%*ENV<HARNESS_TIMER>;
     subset ErrValue where any(IO::Handle:D, Supplier, 'stderr', 'ignore', 'merge');
@@ -987,11 +987,24 @@ class Harness {
         return Output::Supplier.new(:$supplier);
     }
 
+    my sub get-reporter(Reporter $reporter-class, %env-options, $output, $volume) {
+        if $reporter-class !=== Reporter {
+            return $reporter-class;
+        } elsif %env-options<r> {
+            return load-reporter(%env-options<r>);
+        } elsif is-terminal($output) && $volume < Verbose {
+            return TAP::Reporter::Console;
+        } else {
+            return TAP::Reporter::Text;
+        }
+    }
+
     method run(*@names, IO(Str) :$cwd = $*CWD, OutVal :$out = $!output, ErrValue :$err = $!err, *%handler-args) {
         my $killed = Promise.new;
         my $aggregator = self.make-aggregator;
         my $output = make-output($out);
-        my $reporter = $!reporter-class.new(:@names, :$!timer, :$!ignore-exit, :$!volume, :$output, :$!color);
+        my $reporter-class = get-reporter($!reporter-class, %!env-options, $out, $!volume);
+        my $reporter = $reporter-class.new(:@names, :$!timer, :$!ignore-exit, :$!volume, :$output, :$!color);
 
         my @working;
         my $waiter = start {
