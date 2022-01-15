@@ -974,9 +974,6 @@ class Harness {
             $events.act({ $output.say(~$^entry) }, :done({ $output.flush }), :quit({ $output.flush }));
         }
     }
-    method make-source(Str $name) {
-        @!handlers.max(*.can-handle($name)).make-source($name, :$!err, :$!cwd);
-    }
     my &sigint = sub { signal(SIGINT) }
 
     my multi make-output(IO::Handle:D $handle) {
@@ -999,7 +996,7 @@ class Harness {
                 for @names -> $name {
                     my $path = $name ~~ IO ?? $name.IO.relative($!cwd) !! ~$name;
                     my $session = $reporter.open-test($path);
-                    my $source = self.make-source($path);
+                    my $source = @!handlers.max(*.can-handle($name)).make-source($name, :$!err, :$!cwd);
                     my $parser = TAP::Async.new(:$source, :$killed, :$!loose);
                     $session.listen($parser.events);
                     self.add-handlers($parser.events, $output);
