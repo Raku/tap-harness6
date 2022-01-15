@@ -981,10 +981,10 @@ class Harness {
     my multi make-output(Supplier:D $supplier) {
         return Output::Supplier.new(:$supplier);
     }
-    method run(*@names, IO(Str) :$cwd = $*CWD) {
+    method run(*@names, IO(Str) :$cwd = $*CWD, OutVal :$out = $!output, ErrValue :$err = $!err) {
         my $killed = Promise.new;
         my $aggregator = self.make-aggregator;
-        my $output = make-output($!output);
+        my $output = make-output($out);
         my $reporter = $!reporter-class.new(:@names, :$!timer, :$!ignore-exit, :$!volume, :$output, :$!color);
 
         my @working;
@@ -995,7 +995,7 @@ class Harness {
                 for @names -> $name {
                     my $path = $name ~~ IO ?? $name.IO.relative($cwd) !! ~$name;
                     my $session = $reporter.open-test($path);
-                    my $source = @!handlers.max(*.can-handle($name)).make-source($name, :$!err, :$cwd);
+                    my $source = @!handlers.max(*.can-handle($name)).make-source($path, :$err, :$cwd);
                     my $parser = TAP::Async.new(:$source, :$killed, :$!loose);
                     $session.listen($parser.events);
                     self.add-handlers($parser.events, $output);
