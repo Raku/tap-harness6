@@ -897,15 +897,13 @@ class Harness {
         method make-source {...};
     }
     role SourceHandler::Proc does SourceHandler {
-        has Str:D $.path is required;
-        has @.args;
-        method make-source(Str:D $name, Any:D :$err, IO::Path:D :$cwd!) {
-            TAP::Source::Proc.new(:$name, :$!path, :args[ |@!args, $name ], :$err, :$cwd);
-        }
     }
     class SourceHandler::Raku does SourceHandler::Proc {
-        submethod BUILD(:@incdirs, Str:D :$!path = $*EXECUTABLE.absolute) {
-            @!args = @incdirs.map("-I" ~ *);
+        has Str:D $.path = $*EXECUTABLE.absolute;
+        has Str @.incdirs;
+        method make-source(Str:D $name, Any:D :$err, IO::Path:D :$cwd) {
+            my @args = |@!incdirs.map("-I" ~ *), $name;
+            TAP::Source::Proc.new(:$name, :$!path, :@args, :$err, :$cwd);
         }
         method can-handle(Str $name) {
             0.5;
@@ -915,11 +913,14 @@ class Harness {
         # This may later give deprecation warnings
     }
     class SourceHandler::Exec does SourceHandler::Proc {
-        method new (*@ ($path, *@args)) {
-            self.bless(:$path, :@args);
-        }
+        has Str:D $.path is required;
+        has @.args;
         method can-handle(Str $name) {
             1;
+        }
+        method make-source(Str:D $name, Any:D :$err, IO::Path:D :$cwd) {
+            my @args = |@!args, $name;
+            TAP::Source::Proc.new(:$name, :$!path, :@args, :$err, :$cwd);
         }
     }
 
