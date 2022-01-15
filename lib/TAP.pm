@@ -904,8 +904,9 @@ class Harness {
     class SourceHandler::Raku does SourceHandler::Proc {
         has Str:D $.path = $*EXECUTABLE.absolute;
         has Str @.incdirs;
-        method make-source(Str:D $name, Any:D :$err, IO::Path:D :$cwd, *%) {
-            my @args = |@!incdirs.map("-I" ~ *), $name;
+        method make-source(Str:D $name, Any:D :$err, IO::Path:D :$cwd, :@include-dirs = (), *%) {
+            my @dirs = map { normalize-path($_, $cwd) }, |@include-dirs, |@!incdirs;
+            my @args = |@dirs.map("-I" ~ *), $name;
             TAP::Source::Proc.new(:$name, :$!path, :@args, :$err, :$cwd);
         }
         method can-handle(Str $name) {
