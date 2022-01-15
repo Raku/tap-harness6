@@ -954,7 +954,6 @@ class Harness {
     has Bool:D $.loose = $*PERL.compiler.version before 2017.09;
     my @safe-terminals = <xterm eterm vte konsole color>;
     has Bool:D $.color= so %!env-options<c> // %*ENV<HARNESS_COLOR> // !%*ENV<NO_COLOR>.defined && is-terminal($!output) && (%*ENV<TERM> // '') ~~ / @safe-terminals /;
-    has IO::Path:D $.cwd = $*CWD;
 
     class Run {
         has Promise $.waiter handles <result>;
@@ -982,7 +981,7 @@ class Harness {
     my multi make-output(Supplier:D $supplier) {
         return Output::Supplier.new(:$supplier);
     }
-    method run(*@names) {
+    method run(*@names, IO(Str) :$cwd = $*CWD) {
         my $killed = Promise.new;
         my $aggregator = self.make-aggregator;
         my $output = make-output($!output);
@@ -994,9 +993,9 @@ class Harness {
             my $begin = now;
             try {
                 for @names -> $name {
-                    my $path = $name ~~ IO ?? $name.IO.relative($!cwd) !! ~$name;
+                    my $path = $name ~~ IO ?? $name.IO.relative($cwd) !! ~$name;
                     my $session = $reporter.open-test($path);
-                    my $source = @!handlers.max(*.can-handle($name)).make-source($name, :$!err, :$!cwd);
+                    my $source = @!handlers.max(*.can-handle($name)).make-source($name, :$!err, :$cwd);
                     my $parser = TAP::Async.new(:$source, :$killed, :$!loose);
                     $session.listen($parser.events);
                     self.add-handlers($parser.events, $output);
