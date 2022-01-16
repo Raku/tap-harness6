@@ -389,6 +389,7 @@ role Formatter {
     has Bool:D $.ignore-exit = False;
 }
 role Reporter {
+    has Formatter:D $.formatter handles<volume> is required;
     method summarize(TAP::Aggregator, Bool $interrupted, Duration $duration) { ... }
     method open-test(Str $) { ... }
 }
@@ -530,10 +531,8 @@ class Formatter::Text does Formatter {
 }
 class Reporter::Text does Reporter {
     has Output $!output;
-    has Formatter::Text $!formatter handles <volume>;
 
-    submethod BUILD(:@names, :$!output = Output::Handle.new, :$volume = Normal, :$timer = False, Bool :$ignore-exit) {
-        $!formatter = Formatter::Text.new(:@names, :$volume, :$timer, :$ignore-exit);
+    submethod BUILD(:$!output = Output::Handle.new, Formatter:D :$!formatter!) {
     }
 
     method open-test(Str $name) {
@@ -551,9 +550,8 @@ class Reporter::Text does Reporter {
     }
 }
 
-class Formatter::Console is Formatter::Text {
-    has $.color;
-    has &colored = $!color && (try require Terminal::ANSIColor) !=== Nil
+class Formatter::Color is Formatter::Text {
+    has &colored = (try require Terminal::ANSIColor) !=== Nil
         ?? ::('Terminal::ANSIColor::EXPORT::DEFAULT::&colored')
         !! sub ($text, $) { $text };
     method format-success(Str $output) {
@@ -596,15 +594,13 @@ class Reporter::Console::Session does Session {
     }
 }
 class Reporter::Console does Reporter {
-    has Formatter::Console $!formatter handles <volume>;
     has Int $!lastlength;
     has Supplier $events;
     has Reporter::Console::Session @!active;
     has Int $!tests;
     has Int $!fails;
 
-    submethod BUILD(:@names, Output :$output = Output::Handle.new, :$volume = Normal, :$timer = False, Bool :$ignore-exit = False, Bool :$color) {
-        $!formatter = Formatter::Console.new(:@names, :$volume, :$timer, :$ignore-exit, :$color);
+    submethod BUILD(Output :$output = Output::Handle.new, Formatter:D :$!formatter!) {
         $!lastlength = 0;
         $!events = Supplier.new;
         @!active .= new;
@@ -951,7 +947,6 @@ class Harness {
     has Bool:D $.ignore-exit = ?%*ENV<HARNESS_INGORE_EXIT>;
     has Bool:D $.trap = False;
     has Bool:D $.loose = $*PERL.compiler.version before 2017.09;
-    my @safe-terminals = <xterm eterm vte konsole color>;
     has Bool $.color;
 
     class Run {
@@ -1016,9 +1011,10 @@ class Harness {
         my $killed = Promise.new;
         my $aggregator = self.make-aggregator;
         my $output = make-output($out);
+        my $formatter-class = get-color($!color, %!env-options, $output) ?? Formatter::Color !! Formatter::Text;
+        my $formatter = $formatter-class.new(:@names, :$!volume, :$!timer, :$!ignore-exit);
         my $reporter-class = get-reporter($!reporter-class, %!env-options, $output, $!volume);
-        my $color = get-color($!color, %!env-options, $output);
-        my $reporter = $reporter-class.new(:@names, :$!timer, :$!ignore-exit, :$!volume, :$output, :$color);
+        my $reporter = $reporter-class.new(:@names, :$!timer, :$!ignore-exit, :$!volume, :$output, :$formatter);
 
         my @working;
         my $waiter = start {
