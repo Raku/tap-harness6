@@ -1,6 +1,8 @@
 Revision history for TAP
 
 {{$NEXT}}
+
+0.3.3  2022-01-21T23:00:00+01:00
         - Add a cwd argument to TAP::Harness::run
         - Add out and err argument to TAP::Harness::run
         - Allow coloring with verbose outputting
