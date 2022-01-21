@@ -389,6 +389,7 @@ role Formatter {
     has Bool:D $.ignore-exit = False;
 }
 role Reporter {
+    has Output:D $.output is required;
     has Formatter:D $.formatter handles<volume> is required;
     method summarize(TAP::Aggregator, Bool $interrupted, Duration $duration) { ... }
     method open-test(Str $) { ... }
@@ -530,11 +531,6 @@ class Formatter::Text does Formatter {
     }
 }
 class Reporter::Text does Reporter {
-    has Output $!output;
-
-    submethod BUILD(:$!output = Output::Handle.new, Formatter:D :$!formatter!) {
-    }
-
     method open-test(Str $name) {
         my $header = $!formatter.format-name($name);
         Reporter::Text::Session.new(:$name, :$header, :reporter(self));
@@ -594,18 +590,13 @@ class Reporter::Console::Session does Session {
     }
 }
 class Reporter::Console does Reporter {
-    has Int $!lastlength;
-    has Supplier $events;
+    has Int $!lastlength = 0;
+    has Supplier $events = Supplier.new;
     has Reporter::Console::Session @!active;
-    has Int $!tests;
-    has Int $!fails;
+    has Int $!tests = 0;
+    has Int $!fails = 0;
 
-    submethod BUILD(Output :$output = Output::Handle.new, Formatter:D :$!formatter!) {
-        $!lastlength = 0;
-        $!events = Supplier.new;
-        @!active .= new;
-        $!tests = 0;
-
+    submethod TWEAK(:$!output, :$!formatter) {
         my $now = 0;
         my $start = now;
 
@@ -617,13 +608,13 @@ class Reporter::Console does Reporter {
             my @items = @!active.map(*.summary);
             my $ruler = ($header, |@items).join('  ') ~ ')===';
             $ruler = $ruler.substr(0,70) if $ruler.chars > 70;
-            $output.print($!formatter.format-return($ruler));
+            $!output.print($!formatter.format-return($ruler));
         }
         multi receive('update', Str $name, Str $header, Int $number, Int $plan) {
             return if self.volume <= Quiet;
             if @!active.elems == 1 {
                 my $status = ($header, $number, '/', $plan // '?').join('');
-                $output.print($!formatter.format-return($status));
+                $!output.print($!formatter.format-return($status));
                 $!lastlength = $status.chars + 1;
             }
             else {
@@ -632,16 +623,16 @@ class Reporter::Console does Reporter {
         }
         multi receive('bailout', Str $explanation) {
             return if self.volume <= Quiet;
-            $output.print($!formatter.format-failure("Bailout called.  Further testing stopped: $explanation\n"));
+            $!output.print($!formatter.format-failure("Bailout called.  Further testing stopped: $explanation\n"));
         }
         multi receive('result', Reporter::Console::Session $session, TAP::Result $result) {
             return if self.volume <= Quiet;
-            $output.print($!formatter.format-return(' ' x $!lastlength) ~ $!formatter.format-result($session, $result));
+            $!output.print($!formatter.format-return(' ' x $!lastlength) ~ $!formatter.format-result($session, $result));
             @!active = @!active.grep(* !=== $session);
             output-ruler(True) if @!active.elems > 1;
         }
         multi receive('summary', TAP::Aggregator $aggregator, Bool $interrupted, Duration $duration) {
-            $output.print($!formatter.format-summary($aggregator, $interrupted, $duration)) unless self.volume == Silent;
+            $!output.print($!formatter.format-summary($aggregator, $interrupted, $duration)) unless self.volume == Silent;
         }
 
         $!events.Supply.act(-> @args { receive(|@args) });
@@ -1014,7 +1005,7 @@ class Harness {
         my $formatter-class = get-color($!color, %!env-options, $output) ?? Formatter::Color !! Formatter::Text;
         my $formatter = $formatter-class.new(:@names, :$!volume, :$!timer, :$!ignore-exit);
         my $reporter-class = get-reporter($!reporter-class, %!env-options, $output, $!volume);
-        my $reporter = $reporter-class.new(:@names, :$!timer, :$!ignore-exit, :$!volume, :$output, :$formatter);
+        my $reporter = $reporter-class.new(:$output, :$formatter);
 
         my @working;
         my $waiter = start {
