@@ -4,7 +4,7 @@
   ],
   "build-depends" : [ ],
   "depends" : [ ],
-  "description" : "TAP harness for perl6",
+  "description" : "TAP harness for raku",
   "license" : "Artistic-2.0",
   "name" : "TAP",
   "perl" : "6.*",
@@ -12,7 +12,7 @@
     "TAP" : "lib/TAP.pm"
   },
   "resources" : [ ],
-  "source-url" : "git://github.com/perl6/tap-harness6.git",
+  "source-url" : "https://github.com/Raku/tap-harness6.git",
   "tags" : [ ],
   "test-depends" : [ ],
   "version" : "0.3.4"
