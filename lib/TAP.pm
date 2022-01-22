@@ -968,13 +968,16 @@ class Harness {
     has Bool:D $.loose = $*PERL.compiler.version before 2017.09;
     has Bool $.color;
 
-    class Run {
+    class Run does Awaitable {
         has Promise $!waiter handles <result>;
         has Promise $!bailout;
         submethod BUILD (Promise :$!waiter, Promise :$!bailout) {
         }
         method kill(Any:D $reason) {
             $!bailout.break($reason);
+        }
+        method get-await-handle(--> Awaitable::Handle:D) {
+            return $!waiter.promise.get-await-handle;
         }
     }
 
