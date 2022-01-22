@@ -40,11 +40,9 @@ class Sub-Test is Test {
         my @plans = @!entries.grep(Plan);
         if !@plans {
             @errors.push: "Subtest $usable-number doesn't have a plan";
-        }
-        elsif @plans > 1 {
+        } elsif @plans > 1 {
             @errors.push: "Subtest $usable-number has multiple plans";
-        }
-        elsif @plans[0].tests != @tests.elems {
+        } elsif @plans[0].tests != @tests.elems {
             @errors.push: "Subtest $usable-number expected { @plans[0].tests } but contains { @tests.elems } tests";
         }
         @errors;
@@ -325,29 +323,24 @@ my sub parser(Supply $input --> Supply) {
             if $mode == Normal {
                 if $line ~~ / ^ '  ---' / {
                     set-state(Yaml, $line);
-                }
-                elsif $line ~~ &indented {
+                } elsif $line ~~ &indented {
                     set-state(SubTest, $line);
-                }
-                else {
+                } else {
                     emit-reset $grammar.parse($line);
                 }
             }
             elsif $mode == SubTest {
                 if $line ~~ &indented {
                     @buffer.push: $line;
-                }
-                elsif $grammar.parse($line, :rule('test')) -> $test {
+                } elsif $grammar.parse($line, :rule('test')) -> $test {
                     my $raw = (|@buffer, $line).join("\n");
                     if $grammar.parse($raw, :rule('sub-test')) -> $subtest {
                         emit-reset $subtest;
-                    }
-                    else {
+                    } else {
                         emit-unknown;
                         emit-reset $test;
                     }
-                }
-                else {
+                } else {
                     emit-unknown $line;
                 }
             }
@@ -358,13 +351,11 @@ my sub parser(Supply $input --> Supply) {
                         my $raw = @buffer.join("\n");
                         if $grammar.parse($raw, :rule('yaml')) -> $yaml {
                             emit-reset $yaml;
-                        }
-                        else {
+                        } else {
                             emit-unknown;
                         }
                     }
-                }
-                else {
+                } else {
                     emit-unknown $line;
                 }
             }
@@ -468,8 +459,7 @@ class Formatter::Text does Formatter {
                     if $result.wait -> $wait {
                         if $result.exit {
                             $output ~= self.format-failure("Non-zero exit status: { $result.exit }\n");
-                        }
-                        else {
+                        } else {
                             $output ~= self.format-failure("Non-zero wait status: $wait\n");
                         }
                     }
@@ -500,11 +490,9 @@ class Formatter::Text does Formatter {
         my $name = $session.header;
         if ($result.skip-all) {
             $output = self.format-return("$name skipped\n");
-        }
-        elsif ($result.has-problems($!ignore-exit)) {
+        } elsif ($result.has-problems($!ignore-exit)) {
             $output = self.format-test-failure($name, $result);
-        }
-        else {
+        } else {
             my $time = self.timer && $result.time ?? sprintf ' %8d ms', Int($result.time * 1000) !! '';
             $output = self.format-return("$name ok$time\n");
         }
@@ -523,8 +511,7 @@ class Formatter::Text does Formatter {
 
         if $result.failed == 0 {
             $output ~= self.format-failure($total ?? "All $total subtests passed " !! 'No subtests run');
-        }
-        else {
+        } else {
             $output ~= self.format-failure("Failed {$result.failed.elems}/$total subtests ");
             if (!$total) {
                 $output ~= self.format-failure("\nNo tests run!");
@@ -632,8 +619,7 @@ class Reporter::Console does Reporter {
                 my $status = ($header, $number, '/', $plan // '?').join('');
                 $!output.print($!formatter.format-return($status));
                 $!lastlength = $status.chars + 1;
-            }
-            else {
+            } else {
                 output-ruler($number == 1);
             }
         }
@@ -709,19 +695,16 @@ my class State does TAP::Entry::Handler {
     multi method handle-entry(TAP::Version $entry) {
         if $!seen-lines {
             self!add-error('Seen version declaration mid-stream');
-        }
-        elsif $entry.version !~~ $!allowed-versions {
+        } elsif $entry.version !~~ $!allowed-versions {
             self!add-error("Version must be in range $!allowed-versions");
-        }
-        else {
+        } else {
             $!version = $entry.version;
         }
     }
     multi method handle-entry(TAP::Plan $plan) {
         if $!seen-plan != Unseen {
             self!add-error('Seen a second plan');
-        }
-        else {
+        } else {
             $!tests-planned = $plan.tests;
             $!seen-plan = $!tests-run ?? After !! Before;
             $!skip-all = $plan.skip-all;
@@ -740,8 +723,7 @@ my class State does TAP::Entry::Handler {
         my $usable-number = $found-number // $expected-number;
         if $test.is-ok {
             $!passed++;
-        }
-        else {
+        } else {
             @!failed.push($usable-number);
         }
         ($test.ok ?? $!actual-passed !! $!actual-failed)++;
@@ -758,8 +740,7 @@ my class State does TAP::Entry::Handler {
     multi method handle-entry(TAP::Bailout $entry) {
         if $!bailout.defined {
             $!bailout.break($entry);
-        }
-        else {
+        } else {
             $!done.break($entry);
         }
     }
@@ -1013,17 +994,13 @@ class Harness {
     my sub get-color(Bool $color, %env-options, Output $output) {
         with $color {
             return $color;
-        }
-        orwith %env-options<c> {
+        } orwith %env-options<c> {
             return True;
-        }
-        orwith %*ENV<HARNESS_COLOR> {
+        } orwith %*ENV<HARNESS_COLOR> {
             return ?%*ENV<HARNESS_COLOR>;
-        }
-        orwith %*ENV<NO_COLOR> {
+        } orwith %*ENV<NO_COLOR> {
             return False;
-        }
-        else {
+        } else {
             state @safe-terminals = <xterm eterm vte konsole color>;
             return $output.terminal && (%*ENV<TERM> // '') ~~ / @safe-terminals /;
         }
@@ -1076,8 +1053,7 @@ class Harness {
                 if $done {
                     $aggregator.add-result($parser.result);
                     $session.close-test($parser.result);
-                }
-                else {
+                } else {
                     @new-working.push($current);
                 }
             }
