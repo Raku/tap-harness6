@@ -836,7 +836,7 @@ class Async {
                 $async.bind-stderr($devnull);
             }
             when IO::Handle:D {
-                $async.stderr.lines(:close).act({ $err.say($_) });
+                $async.bind-stderr($err);
             }
             when Supplier:D {
                 $async.stderr.act({ $err.emit($_) }, :done({ $err.done }), :quit({ $err.quit($^reason) }));
