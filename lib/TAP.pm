@@ -969,12 +969,12 @@ class Harness {
     has Bool $.color;
 
     class Run {
-        has Promise $.waiter handles <result>;
-        has Promise $!killed;
-        submethod BUILD (Promise :$!waiter, Promise :$!killed) {
+        has Promise $!waiter handles <result>;
+        has Promise $!bailout;
+        submethod BUILD (Promise :$!waiter, Promise :$!bailout) {
         }
         method kill(Any:D $reason) {
-            $!killed.break($reason);
+            $!bailout.break($reason);
         }
     }
 
@@ -1027,7 +1027,7 @@ class Harness {
     }
 
     method run(*@names, IO(Str) :$cwd = $*CWD, OutVal :$out = $!output, ErrValue :$err = $!err, *%handler-args) {
-        my $killed = Promise.new;
+        my $bailout = Promise.new;
         my $aggregator = self.make-aggregator;
         my $output = make-output($out);
         my $formatter-class = get-color($!color, %!env-options, $output) ?? Formatter::Color !! Formatter::Text;
@@ -1037,23 +1037,23 @@ class Harness {
 
         my @working;
         my $waiter = start {
-            my $int = $!trap ?? sigint().tap({ $killed.break("Interrupted"); $int.close(); }) !! Tap;
+            my $int = $!trap ?? sigint().tap({ $bailout.break("Interrupted"); $int.close(); }) !! Tap;
             my $begin = now;
             try {
                 for @names -> $name {
                     my $path = normalize-path($name, $cwd);
                     my $session = $reporter.open-test($path);
                     my $source = @!handlers.max(*.can-handle($name)).make-source($path, :$err, :$cwd, |%handler-args);
-                    my $parser = TAP::Async.new(:$source, :$killed, :$!loose);
+                    my $parser = TAP::Async.new(:$source, :$bailout, :$!loose);
                     $session.listen($parser.events);
                     self.add-handlers($parser.events, $output);
                     @working.push({ :$parser, :$session, :done($parser.waiter) });
                     next if @working < $!jobs;
-                    await Promise.anyof(@working»<done>, $killed);
+                    await Promise.anyof(@working»<done>, $bailout);
                     reap-finished();
                 }
                 while @working {
-                    await Promise.anyof(@working»<done>, $killed);
+                    await Promise.anyof(@working»<done>, $bailout);
                     reap-finished();
                 }
                 CATCH {
@@ -1063,7 +1063,7 @@ class Harness {
                     }
                 }
             }
-            $reporter.summarize($aggregator, ?$killed, now - $begin) if !$killed || $!trap;
+            $reporter.summarize($aggregator, ?$bailout, now - $begin) if !$bailout || $!trap;
             $int.close if $int;
             $aggregator;
         }
@@ -1080,7 +1080,7 @@ class Harness {
             }
             @working = @new-working;
         }
-        Run.new(:$waiter, :$killed);
+        Run.new(:$waiter, :$bailout);
     }
 }
 
