@@ -906,6 +906,9 @@ class Harness {
     class SourceHandler::Exec does SourceHandler::Proc {
         has Str:D $.path is required;
         has @.args;
+        method new (*@ ($path, *@args)) {
+            self.bless(:$path, :@args);
+        }
         method can-handle(Str $name) {
             1;
         }

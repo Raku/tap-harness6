@@ -1,6 +1,7 @@
 Revision history for TAP
 
 {{$NEXT}}
+        - Restore SourceHandler::Exec's constructor
 
 0.3.4  2022-01-21T23:29:46+01:00
         - Allow SourceHandler::Raku's incdirs arguments to be Str or IO::Path
