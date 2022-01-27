@@ -1,6 +1,6 @@
 use v6;
 
-unit module TAP:ver<0.3.4>;
+unit module TAP:ver<0.3.5>;
 
 role Entry {
     has Str:D $.raw is required handles <Str>;
@@ -69,16 +69,9 @@ my role Entry::Handler {
     method handle-entry(Entry) { ... }
     method end-entries() { }
     method listen(Supply $supply) {
-        $supply.act(-> $entry {
-                self.handle-entry($entry);
-            },
-            done => {
-                self.end-entries();
-            },
-            quit => {
-                self.end-entries();
-            }
-        );
+        my $act = { self.handle-entry($^entry) };
+        my $done = my $quit = { self.end-entries() };
+        $supply.act($act, :$done, :$quit);
     }
 }
 

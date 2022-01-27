@@ -15,5 +15,5 @@
   "source-url" : "https://github.com/Raku/tap-harness6.git",
   "tags" : [ ],
   "test-depends" : [ ],
-  "version" : "0.3.4"
+  "version" : "0.3.5"
 }
