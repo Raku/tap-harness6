@@ -812,13 +812,9 @@ class Source::Supply does Source {
 
 class Async {
     has Str $.name;
-    has Run $!run handles <kill events>;
-    has State $!state;
-    has Promise $.waiter;
-
-    submethod BUILD(Str :$!name, State :$!state, Run :$!run) {
-        $!waiter = Promise.allof($!state.done, $!run.process);
-    }
+    has Run $!run handles <kill events> is built;
+    has State $!state is built;
+    has Promise $.waiter is built(False) = Promise.allof($!state.done, $!run.process);
 
     multi get_runner(Source::Proc $proc) {
         my $async = Proc::Async.new($proc.path, $proc.args);
@@ -947,10 +943,8 @@ class Harness {
     has Bool $.color;
 
     class Run does Awaitable {
-        has Promise $!waiter handles <result>;
-        has Promise $!bailout;
-        submethod BUILD (Promise :$!waiter, Promise :$!bailout) {
-        }
+        has Promise $!waiter handles <result> is built;
+        has Promise $!bailout is built;
         method kill(Any:D $reason) {
             $!bailout.break($reason);
         }
