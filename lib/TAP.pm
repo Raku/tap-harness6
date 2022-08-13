@@ -467,7 +467,7 @@ class Formatter::Text does Formatter {
         $output ~= "Files={ $aggregator.result-count }, Tests={ $aggregator.tests-run }$timing\n";
         my $status = $aggregator.get-status;
         $output ~= "Result: $status\n";
-        $output;
+        self.format-return($output);
     }
     method format-success(Str $output) {
         $output;
@@ -586,7 +586,7 @@ class Reporter::Console::Session does Session {
     }
 }
 class Reporter::Console does Reporter {
-    has Int $!lastlength = 0;
+    has Int $!last-length = 0;
     has Supplier $events = Supplier.new;
     has Reporter::Console::Session @!active;
     has Int $!tests = 0;
@@ -604,14 +604,16 @@ class Reporter::Console does Reporter {
             my @items = @!active.map(*.summary);
             my $ruler = ($header, |@items).join('  ') ~ ')===';
             $ruler = $ruler.substr(0,70) if $ruler.chars > 70;
-            $!output.print($!formatter.format-return($ruler));
+            my $output = $!formatter.format-return($ruler);
+            $!last-length = $output.chars;
+            $!output.print($output);
         }
         multi receive('update', Str $name, Str $header, Int $number, Int $plan) {
             return if self.volume <= Quiet;
             if @!active.elems == 1 {
                 my $status = ($header, $number, '/', $plan // '?').join('');
                 $!output.print($!formatter.format-return($status));
-                $!lastlength = $status.chars + 1;
+                $!last-length = $status.chars;
             } else {
                 output-ruler($number == 1);
             }
@@ -622,7 +624,9 @@ class Reporter::Console does Reporter {
         }
         multi receive('result', Reporter::Console::Session $session, TAP::Result $result) {
             return if self.volume <= Quiet;
-            $!output.print($!formatter.format-return(' ' x $!lastlength) ~ $!formatter.format-result($session, $result));
+            my $output = $!formatter.format-result($session, $result);
+            $!output.print($!formatter.format-return(' ' x $!last-length) ~ $output);
+            $!last-length = $output.chars;
             @!active = @!active.grep(* !=== $session);
             output-ruler(True) if @!active.elems > 1;
         }
