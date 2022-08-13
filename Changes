@@ -1,6 +1,8 @@
 Revision history for TAP
 
 {{$NEXT}}
+
+0.3.6  2022-08-13T19:29:29+02:00
         - Fix progress bar outputting in parallel mode
 
 0.3.5  2022-01-27T20:21:45+01:00

@@ -1,19 +1,24 @@
 {
-  "authors" : [
+  "authors": [
     "Leon Timmermans"
   ],
-  "build-depends" : [ ],
-  "depends" : [ ],
-  "description" : "TAP harness for raku",
-  "license" : "Artistic-2.0",
-  "name" : "TAP",
-  "perl" : "6.*",
-  "provides" : {
-    "TAP" : "lib/TAP.pm"
+  "build-depends": [
+  ],
+  "depends": [
+  ],
+  "description": "TAP harness for raku",
+  "license": "Artistic-2.0",
+  "name": "TAP",
+  "perl": "6.*",
+  "provides": {
+    "TAP": "lib/TAP.pm"
   },
-  "resources" : [ ],
-  "source-url" : "https://github.com/Raku/tap-harness6.git",
-  "tags" : [ ],
-  "test-depends" : [ ],
-  "version" : "0.3.5"
+  "resources": [
+  ],
+  "source-url": "https://github.com/Raku/tap-harness6.git",
+  "tags": [
+  ],
+  "test-depends": [
+  ],
+  "version": "0.3.6"
 }
