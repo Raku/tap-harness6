@@ -1,6 +1,8 @@
 Revision history for TAP
 
 {{$NEXT}}
+
+0.3.7  2022-08-31T13:32:07+02:00
         - Handle start failures more gracefully
         - Don't report succes when no tests have been run
         - Allow running binary tests
