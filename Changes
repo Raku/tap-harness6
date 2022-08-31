@@ -2,6 +2,7 @@ Revision history for TAP
 
 {{$NEXT}}
         - Handle start failures more gracefully
+        - Don't report succes when no tests have been run
 
 0.3.6  2022-08-13T19:29:29+02:00
         - Fix progress bar outputting in parallel mode

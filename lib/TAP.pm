@@ -433,7 +433,7 @@ class Formatter::Text does Formatter {
             $output ~= self.format-failure("Test run interrupted!\n")
         }
 
-        if $aggregator.failed == 0 {
+        if $aggregator.failed == 0 && $aggregator.tests-run > 0 {
             $output ~= self.format-success("All tests successful.\n");
         }
 
