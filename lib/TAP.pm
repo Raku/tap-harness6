@@ -75,6 +75,20 @@ my role Entry::Handler {
     }
 }
 
+class Status {
+    has Int $.exit;
+    has Int $.signal;
+    method new(Int $exit, Int $signal) {
+        self.bless(:$exit, :$signal);
+    }
+    multi method wait(::?CLASS:D:) {
+        ($!exit +< 8) +| $!signal;
+    }
+    multi method wait(::?CLASS:U:) {
+        Int;
+    }
+}
+
 class Result {
     has Str $.name;
     has Int $.tests-planned;
@@ -89,20 +103,11 @@ class Result {
     has Int $.skipped;
     has Int $.unknowns;
     has Bool $.skip-all;
-    has Proc $.exit-status;
+    has Status $.exit-status handles <exit signal wait>;
     has Duration $.time;
-    method exit() {
-        $!exit-status.defined ?? $!exit-status.exitcode !! Int;
-    }
-    method wait() {
-        $!exit-status.defined ?? ($!exit-status.exitcode +< 8) +| $!exit-status.signal !! Int;
-    }
 
     method has-problems($ignore-exit = False) {
         so @!failed || @!errors || (!$ignore-exit && self.exit-failed);
-    }
-    method exit-failed() {
-        so $!exit-status.defined && ($!exit-status.exitcode || $!exit-status.signal);
     }
 }
 
@@ -764,7 +769,7 @@ my class State does TAP::Entry::Handler {
         }
         $!done.keep;
     }
-    method finalize(Str $name, Proc $exit-status, Duration $time) {
+    method finalize(Str $name, Status $exit-status, Duration $time) {
         TAP::Result.new(:$name, :$!tests-planned, :$!tests-run, :$!passed, :@!failed, :@!errors, :$!skip-all,
             :$!actual-passed, :$!actual-failed, :$!todo, :@!todo-passed, :$!skipped, :$!unknowns, :$exit-status, :$time);
     }
@@ -776,7 +781,14 @@ my class State does TAP::Entry::Handler {
 my class Run {
     subset Killable of Any where { .can('kill') };
     has Supply:D $.events is required;
-    has Promise:D $.process = $!events.Promise;
+    my sub get-finished(Supply $supply) {
+        my $result = Promise.new;
+        my &done = -> { $result.keep(Status.new(0, 0)) };
+        my &quit = -> $reason { $result.keep(Status.new(255, 0)) };
+        $supply.tap(-> $ {}, :&done, :&quit);
+        $result;
+    }
+    has Promise:D $.process = get-finished($!events);
     has Killable $!killer;
     has Promise $!timer;
 
@@ -784,7 +796,11 @@ my class Run {
         $!killer.kill if $!process;
     }
     method exit-status() {
-        $!process.result ~~ Proc ?? $.process.result !! Proc;
+        with try $!process.result -> $result {
+            Status.new($result.exit, $result.signal);
+        } else {
+            Status.new(255, 0);
+        }
     }
     method time() {
         $!timer.defined ?? $!timer.result !! Duration;
