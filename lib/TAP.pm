@@ -919,17 +919,16 @@ class Harness {
         # This may later give deprecation warnings
     }
     class SourceHandler::Exec does SourceHandler::Proc {
-        has Str:D $.path is required;
         has @.args;
-        method new (*@ ($path, *@args)) {
-            self.bless(:$path, :@args);
+        method new (*@args) {
+            self.bless(:@args);
         }
         method can-handle(Str $name) {
             1;
         }
         method make-source(Str:D $name, Any:D :$err, IO::Path:D :$cwd, *%) {
-            my @args = |@!args, $name;
-            TAP::Source::Proc.new(:$name, :$!path, :@args, :$err, :$cwd);
+            my ($path, *@args) = @!args ?? (|@!args, $name) !! ~$cwd.add($name);
+            TAP::Source::Proc.new(:$name, :$path, :@args, :$err, :$cwd);
         }
     }
 
