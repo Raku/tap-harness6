@@ -107,7 +107,7 @@ class Result {
     has Duration $.time;
 
     method has-problems($ignore-exit = False) {
-        so @!failed || @!errors || (!$ignore-exit && self.exit-failed);
+        so @!failed || @!errors || (!$ignore-exit && $!exit-status.wait);
     }
 }
 
@@ -796,11 +796,7 @@ my class Run {
         $!killer.kill if $!process;
     }
     method exit-status() {
-        with try $!process.result -> $result {
-            Status.new($result.exit, $result.signal);
-        } else {
-            Status.new(255, 0);
-        }
+        try { $!process.result } // Status.new(255, 0);
     }
     method time() {
         $!timer.defined ?? $!timer.result !! Duration;
@@ -860,7 +856,8 @@ class Async {
                 die "Unknown error handler";
             }
         }
-        my $process = $async.start(:cwd($proc.cwd));
+        my $start = $async.start(:cwd($proc.cwd));
+        my $process = $start.then({ my $result = $start.result; Status.new($result.exitcode, $result.signal) });
         my $start-time = now;
         my $timer = $process.then({ now - $start-time });
         Run.new(:$process, :killer($async), :$timer, :$events);

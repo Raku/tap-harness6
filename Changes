@@ -1,6 +1,7 @@
 Revision history for TAP
 
 {{$NEXT}}
+        - Correctly check exit code of processes
 
 0.3.7  2022-08-31T13:32:07+02:00
         - Handle start failures more gracefully
