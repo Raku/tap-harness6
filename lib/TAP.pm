@@ -891,21 +891,20 @@ class Async {
 }
 
 class Harness {
+    subset Priority of Numeric where 0..1;
     role SourceHandler {
         method can-handle {...};
         method make-source {...};
     }
-    role SourceHandler::Proc does SourceHandler {
-    }
     my sub normalize-path($path, IO::Path $cwd) {
-        $path ~~ IO ?? $path.IO.relative($cwd) !! ~$path
+        $path ~~ IO ?? $path.relative($cwd) !! ~$path
     }
-    class SourceHandler::Raku does SourceHandler::Proc {
+    class SourceHandler::Raku does SourceHandler {
         has Str:D $.path = $*EXECUTABLE.absolute;
         has @.incdirs;
         method make-source(Str:D $name, Any:D :$err, IO::Path:D :$cwd, :@include-dirs = (), *%) {
-            my @dirs = map { normalize-path($_, $cwd) }, |@include-dirs, |@!incdirs;
-            my @args = |@dirs.map("-I" ~ *), $name;
+            my @dirs = flat @include-dirs, @!incdirs;
+            my @args = |@dirs.map({ "-I" ~ normalize-path($^dir, $cwd) }), $name;
             TAP::Source::Proc.new(:$name, :$!path, :@args, :$err, :$cwd);
         }
         method can-handle(Str $name) {
@@ -915,13 +914,14 @@ class Harness {
     class SourceHandler::Perl6 is SourceHandler::Raku {
         # This may later give deprecation warnings
     }
-    class SourceHandler::Exec does SourceHandler::Proc {
+    class SourceHandler::Exec does SourceHandler {
         has @.args;
+        has Priority $.priority = 1;
         method new (*@args) {
             self.bless(:@args);
         }
         method can-handle(Str $name) {
-            1;
+            $!priority;
         }
         method make-source(Str:D $name, Any:D :$err, IO::Path:D :$cwd, *%) {
             my ($path, *@args) = @!args ?? (|@!args, $name) !! ~$cwd.add($name);
