@@ -804,7 +804,7 @@ my class Run {
 }
 
 role Source {
-    has Str $.name;
+    has Str $.name = '';
 }
 class Source::Proc does Source {
     has Str $.path is required;
@@ -928,6 +928,15 @@ class Harness {
             TAP::Source::Proc.new(:$name, :$path, :@args, :$err, :$cwd);
         }
     }
+    class SourceHandler::File does SourceHandler {
+        method can-handle(Str $name) {
+            $name ~~ /\.tap$/ ?? 1 !! 0;
+        }
+        method make-source(Str:D $name, Any:D :$err, IO::Path:D :$cwd, *%) {
+            my $filename = $cwd.add($name);
+            TAP::Source::File.new(:$name, :$filename);
+        }
+    }
 
     my sub load-reporter(Str $name --> Reporter) {
         my $classname = $name.subst('-', '::', :g);
@@ -939,7 +948,7 @@ class Harness {
 
     subset OutVal where any(IO::Handle:D, Supplier:D);
 
-    has SourceHandler @.handlers = SourceHandler::Raku.new();
+    has SourceHandler @.handlers = ( SourceHandler::Raku.new, SourceHandler::File.new );
     has IO::Handle $.handle = $*OUT;
     has OutVal $.output = $!handle;
     has Formatter::Volume $.volume = ?%*ENV<HARNESS_VERBOSE> ?? Verbose !! Normal;
