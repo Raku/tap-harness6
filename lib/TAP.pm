@@ -971,14 +971,8 @@ class Harness {
     has Bool $.color;
 
     class Run does Awaitable {
-        has Promise $!waiter handles <result> is built;
-        has Promise $!bailout is built;
-        method kill(Any:D $reason) {
-            $!bailout.break($reason);
-        }
-        method get-await-handle(--> Awaitable::Handle:D) {
-            return $!waiter.promise.get-await-handle;
-        }
+        has Promise $!waiter handles <result get-await-handle> is built;
+        has Promise $!bailout is built handles :kill<break>;
     }
 
     method make-aggregator() {
