@@ -805,35 +805,20 @@ my class Run {
 
 role Source {
     has Str $.name = '';
+    method get-runner() { ... }
 }
 class Source::Proc does Source {
     has Str $.path is required;
     has @.args;
     has $.err is required;
     has $.cwd is required;
-}
-class Source::File does Source {
-    has IO(Str) $.filename handles<slurp>;
-}
-class Source::String does Source {
-    has Str $.content;
-}
-class Source::Supply does Source {
-    has Supply $.supply;
-}
 
-class Async {
-    has Str $.name;
-    has Run $!run handles <kill events> is built;
-    has State $!state is built;
-    has Promise $.waiter is built(False) = Promise.allof($!state.done, $!run.process);
-
-    multi get_runner(Source::Proc $proc) {
-        my $async = Proc::Async.new($proc.path, $proc.args);
+    method get-runner() {
+        my $async = Proc::Async.new($!path, @!args);
         my $events = parser($async.stdout);
         state $devnull;
         END { $devnull.close with $devnull }
-        given $proc.err {
+        given $!err {
             my $err = $_;
             when 'stderr' { #default is correct
             }
@@ -856,29 +841,48 @@ class Async {
                 die "Unknown error handler";
             }
         }
-        my $start = $async.start(:cwd($proc.cwd));
+        my $start = $async.start(:$!cwd);
         my $process = $start.then({ my $result = $start.result; Status.new($result.exitcode, $result.signal) });
         my $start-time = now;
         my $timer = $process.then({ now - $start-time });
         Run.new(:$process, :killer($async), :$timer, :$events);
     }
-    multi get_runner(Source::Supply $supply) {
+}
+class Source::File does Source {
+    has IO(Str) $.filename handles<slurp>;
+
+    method get-runner() {
+        my $events = parser(supply { emit self.slurp(:close) });
+        Run.new(:$events);
+    }
+}
+class Source::String does Source {
+    has Str $.content;
+
+    method get-runner() {
+        my $events = parser(supply { emit $!content });
+        Run.new(:$events);
+    }
+}
+class Source::Supply does Source {
+    has Supply $.supply;
+
+    method get-runner() {
         my $start-time = now;
-        my $events = parser($supply.supply);
+        my $events = parser($!supply);
         Run.new(:$events);
     }
-    multi get_runner(Source::File $file) {
-        my $events = parser(supply { emit $file.slurp(:close) });
-        Run.new(:$events);
-    }
-    multi get_runner(Source::String $string) {
-        my $events = parser(supply { emit $string.content });
-        Run.new(:$events);
-    }
+}
+
+class Async {
+    has Str $.name;
+    has Run $!run handles <kill events> is built;
+    has State $!state is built;
+    has Promise $.waiter is built(False) = Promise.allof($!state.done, $!run.process);
 
     method new(Source :$source, Promise :$bailout, Bool :$loose) {
         my $state = State.new(:$bailout, :$loose);
-        my $run = get_runner($source);
+        my $run = $source.get-runner;
         $state.listen($run.events);
         Async.bless(:name($source.name), :$state, :$run);
     }
