@@ -875,7 +875,7 @@ class Source::Supply does Source {
     }
 }
 
-class Async {
+class Parser {
     has Str $.name;
     has Run $!run handles <kill events> is built;
     has State $!state is built;
@@ -884,7 +884,7 @@ class Async {
     method new(Source :$source, Promise :$bailout, Bool :$loose) {
         my $state = State.new(:$bailout, :$loose);
         my $run = $source.get-runner($state);
-        Async.bless(:name($source.name), :$state, :$run);
+        self.bless(:name($source.name), :$state, :$run);
     }
 
     has TAP::Result $!result;
@@ -1034,7 +1034,7 @@ class Harness {
                     my $path = normalize-path($name, $cwd);
                     my $session = $reporter.open-test($path);
                     my $source = @!handlers.max(*.can-handle($path)).make-source($path, :$err, :$cwd, |%handler-args);
-                    my $parser = TAP::Async.new(:$source, :$bailout, :$!loose);
+                    my $parser = TAP::Parser.new(:$source, :$bailout, :$!loose);
                     $session.listen($parser.events);
                     self.add-handlers($parser.events, $output);
                     @working.push({ :$parser, :$session, :done($parser.waiter) });
