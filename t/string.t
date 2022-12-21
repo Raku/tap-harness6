@@ -111,16 +111,15 @@ done-testing();
 my $i;
 sub parse-and-get($content, :$tests-planned, :$tests-run, :$passed, :$failed, :$todo-passed, :$skipped, :$unknowns, :@errors = Array, :$name = "Test-{ ++$i }") {
 	my $source = TAP::Source::String.new(:$name, :$content);
-	my $parser = $source.parse;
 
-	my $result = $parser.result;
-	is($result.tests-planned, $tests-planned, "Expected $tests-planned planned tests in $name") if $tests-planned.defined;
-	is($result.tests-run, $tests-run, "Expected $tests-run run tests in $name") if $tests-run.defined;
-	is($result.passed, $passed, "Expected $passed passed tests in $name") if $passed.defined;
-	is($result.failed.elems, $failed, "Expected $failed failed tests in $name") if $failed.defined;
-	is($result.todo-passed.elems, $todo-passed, "Expected $todo-passed todo-passed tests in $name") if $todo-passed.defined;
-	is($result.skipped, $skipped, "Expected $skipped skipped tests in $name") if $skipped.defined;
-	is($result.unknowns, $unknowns, "Expected $unknowns unknown tests in $name") if $unknowns.defined;
+	my $result = $source.parse.result;
+	is($result.tests-planned, $tests-planned, "Expected $tests-planned planned tests in $name");
+	is($result.tests-run, $tests-run, "Expected $tests-run run tests in $name");
+	is($result.passed, $passed, "Expected $passed passed tests in $name");
+	is($result.failed.elems, $failed, "Expected $failed failed tests in $name");
+	is($result.todo-passed.elems, $todo-passed, "Expected $todo-passed todo-passed tests in $name");
+	is($result.skipped, $skipped, "Expected $skipped skipped tests in $name");
+	is($result.unknowns, $unknowns, "Expected $unknowns unknown tests in $name");
 	is-deeply($result.errors, Array[Str].new(|@errors), 'Got expected errors: ' ~ @errors.map({qq{"$_"}}).join(', ')) if @errors.defined;
 
 	return $result;
@@ -128,9 +127,6 @@ sub parse-and-get($content, :$tests-planned, :$tests-run, :$passed, :$failed, :$
 
 sub lex-and-get($content) {
 	my $source = TAP::Source::String.new(:$content);
-	my $async = $source.parse;
-	my @events;
-	$async.events.act({ @events.push: $^event });
-	await $async;
+	my @events = $source.parse.events.list;
 	return @events;
 }
