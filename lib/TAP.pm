@@ -800,9 +800,17 @@ my class Run {
     }
 }
 
+class Parser { ... }
+
 role Source {
     has Str $.name = '';
     method get-runner() { ... }
+
+    method parse(Promise :$bailout, Bool :$loose) {
+        my $state = State.new(:$bailout, :$loose);
+        my $run = self.get-runner($state);
+        Parser.new(:$!name, :$state, :$run);
+    }
 }
 class Source::Proc does Source {
     has Str $.path is required;
@@ -838,11 +846,11 @@ class Source::Proc does Source {
                 die "Unknown error handler";
             }
         }
+        $state.listen($events);
         my $start = $async.start(:$!cwd);
         my $process = $start.then({ my $result = $start.result; Status.new($result.exitcode, $result.signal) });
         my $start-time = now;
         my $timer = $process.then({ now - $start-time });
-        $state.listen($events);
         Run.new(:$process, :killer($async), :$timer, :$events);
     }
 }
@@ -880,12 +888,6 @@ class Parser {
     has Run $!run handles <kill events> is built;
     has State $!state is built;
     has Promise $.waiter is built(False) = Promise.allof($!state.done, $!run.process);
-
-    method new(Source :$source, Promise :$bailout, Bool :$loose) {
-        my $state = State.new(:$bailout, :$loose);
-        my $run = $source.get-runner($state);
-        self.bless(:name($source.name), :$state, :$run);
-    }
 
     has TAP::Result $!result;
     method result {
@@ -1034,7 +1036,7 @@ class Harness {
                     my $path = normalize-path($name, $cwd);
                     my $session = $reporter.open-test($path);
                     my $source = @!handlers.max(*.can-handle($path)).make-source($path, :$err, :$cwd, |%handler-args);
-                    my $parser = TAP::Parser.new(:$source, :$bailout, :$!loose);
+                    my $parser = $source.parse(:$bailout, :$!loose);
                     $session.listen($parser.events);
                     self.add-handlers($parser.events, $output);
                     @working.push({ :$parser, :$session, :done($parser.waiter) });
