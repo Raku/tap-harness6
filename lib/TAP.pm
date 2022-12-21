@@ -879,7 +879,8 @@ class Source::Supply does Source {
         my $start-time = now;
         my $events = parse-stream($!supply);
         $state.listen($events);
-        Run.new(:$events);
+        my $timer = $events.Promise.then( -> $ { now - $start-time });
+        Run.new(:$events, :$timer);
     }
 }
 
