@@ -167,11 +167,12 @@ class Aggregator {
 }
 
 grammar Grammar {
-    regex TOP {
-        ^ [ <plan> | <test> | <bailout> | <version> | <pragma> | <comment> || <unknown> ] $
-    }
+    token TOP { [ <entry> \n ]+ }
     token sp { <[\s] - [\n]> }
     token num { <[0..9]>+ }
+    token entry {
+        ^^ [ <plan> | <test> | <bailout> | <version> | <comment> | <pragma> | <yaml> | <sub-test> || <unknown> ] $$
+    }
     token plan {
         '1..' <count=.num> <.sp>* [
             '#' <.sp>* $<directive>=[:i 'SKIP'] \S*
@@ -228,6 +229,9 @@ grammar Grammar {
 
 class Actions {
     method TOP($/) {
+        make @<entry>».made;
+    }
+    method entry($/) {
         make $/.values[0].made;
     }
     method plan($/) {
@@ -317,7 +321,7 @@ my sub parser(Supply $input --> Supply) {
                 } elsif $line ~~ &indented {
                     set-state(SubTest, $line);
                 } else {
-                    emit-reset $grammar.parse($line, :actions(Actions));
+                    emit-reset $grammar.parse($line, :rule('entry'), :actions(Actions));
                 }
             }
             elsif $mode == SubTest {
