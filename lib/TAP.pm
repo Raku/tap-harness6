@@ -1026,7 +1026,7 @@ class Harness {
                 for @names -> $name {
                     my $path = normalize-path($name, $cwd);
                     my $session = $reporter.open-test($path);
-                    my $source = @!handlers.max(*.can-handle($name)).make-source($path, :$err, :$cwd, |%handler-args);
+                    my $source = @!handlers.max(*.can-handle($path)).make-source($path, :$err, :$cwd, |%handler-args);
                     my $parser = TAP::Async.new(:$source, :$bailout, :$!loose);
                     $session.listen($parser.events);
                     self.add-handlers($parser.events, $output);
