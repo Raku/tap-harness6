@@ -287,7 +287,7 @@ class Actions {
     }
 }
 
-my sub parser(Supply $input --> Supply) {
+my sub parse-stream(Supply $input --> Supply) {
     supply {
         enum Mode <Normal SubTest Yaml >;
         my Mode $mode = Normal;
@@ -812,7 +812,7 @@ class Source::Proc does Source {
 
     method get-runner(State $state) {
         my $async = Proc::Async.new($!path, @!args);
-        my $events = parser($async.stdout);
+        my $events = parse-stream($async.stdout);
         state $devnull;
         END { $devnull.close with $devnull }
         given $!err {
@@ -850,7 +850,7 @@ class Source::File does Source {
     has IO(Str) $.filename handles<slurp>;
 
     method get-runner(State $state) {
-        my $events = parser(supply { emit self.slurp(:close) });
+        my $events = parse-stream(supply { emit self.slurp(:close) });
         $state.listen($events);
         Run.new(:$events);
     }
@@ -859,7 +859,7 @@ class Source::String does Source {
     has Str $.content;
 
     method get-runner(State $state) {
-        my $events = parser(supply { emit $!content });
+        my $events = parse-stream(supply { emit $!content });
         $state.listen($events);
         Run.new(:$events);
     }
@@ -869,7 +869,7 @@ class Source::Supply does Source {
 
     method get-runner(State $state) {
         my $start-time = now;
-        my $events = parser($!supply);
+        my $events = parse-stream($!supply);
         $state.listen($events);
         Run.new(:$events);
     }
