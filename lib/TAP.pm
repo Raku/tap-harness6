@@ -883,17 +883,11 @@ class Source::Supply does Source {
     }
 }
 
-class Parser {
+class Parser does Awaitable {
     has Str $.name;
     has Run $!run handles <kill events> is built;
     has State $!state is built;
-    has Promise $.waiter is built(False) = Promise.allof($!state.done, $!run.process);
-
-    has TAP::Result $!result;
-    method result {
-        await $!waiter;
-        $!result //= $!state.finalize($!name, $!run.exit-status, $!run.time);
-    }
+    has Promise $.waiter is built(False) handles <result get-await-handle> = Promise.allof($!state.done, $!run.process).then({ $!state.finalize($!name, $!run.exit-status, $!run.time) });
 }
 
 class Harness {

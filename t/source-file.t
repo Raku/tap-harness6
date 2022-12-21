@@ -8,7 +8,7 @@ plan 6;
 my $filename = $*PROGRAM.parent.child('source-file-test-data');
 my $source = TAP::Source::File.new(:$filename);
 my $parser = $source.parse;
-await $parser.waiter;
+await $parser;
 my $result = $parser.result;
 
 is($result.tests-planned, 2, "planned 2");
