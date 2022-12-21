@@ -166,7 +166,7 @@ class Aggregator {
     }
 }
 
-my grammar Grammar {
+grammar Grammar {
     regex TOP {
         ^ [ <plan> | <test> | <bailout> | <version> | <pragma> | <comment> || <unknown> ] $
     }
@@ -224,69 +224,62 @@ my grammar Grammar {
     token unknown {
         \N*
     }
-    class Actions {
-        method TOP($/) {
-            make $/.values[0].made;
-        }
-        method plan($/) {
-            my %args = :raw(~$/), :tests(+$<count>);
-            if $<directive> {
-                %args<skip-all explanation> = True, ~$<explanation>;
-            }
-            make TAP::Plan.new(|%args);
-        }
-        method description($m) {
-            $m.make: ~$m.subst(/\\('#'|'\\')/, { $_[0] }, :g)
-        }
-        method !make_test($/) {
-            my %args = (:ok($<nok> eq ''));
-            %args<number> = $<num> ?? +$<num> !! Int;
-            %args<description> = $<description>.made if $<description>;
-            %args<directive> = $<directive> ?? TAP::Directive::{~$<directive>.substr(0,4).tclc} !! TAP::No-Directive;
-            %args<explanation> = ~$<explanation> if $<explanation>;
-            %args;
-        }
-        method test($/) {
-            make TAP::Test.new(:raw(~$/), |self!make_test($/));
-        }
-        method bailout($/) {
-            make TAP::Bailout.new(:raw(~$/), :explanation($<explanation> ?? ~$<explanation> !! Str));
-        }
-        method version($/) {
-            make TAP::Version.new(:raw(~$/), :version(+$<version>));
-        }
-        method pragma-identifier($/) {
-            make $<name> => ?( $<sign> eq '+' );
-        }
-        method pragma($/) {
-            my Bool:D %identifiers = @<pragma-identifier>.map(*.ast);
-            make TAP::Pragma.new(:raw(~$/), :%identifiers);
-        }
-        method comment($/) {
-            make TAP::Comment.new(:raw(~$/), :comment(~$<comment>));
-        }
-        method yaml($/) {
-            my $serialized = $<yaml-line>.join('');
-            my $deserialized = try (require YAMLish) ?? YAMLish::load-yaml("---\n$serialized...") !! Any;
-            make TAP::YAML.new(:raw(~$/), :$serialized, :$deserialized);
-        }
-        method sub-entry($/) {
-            make $/.values[0].made;
-        }
-        method sub-test($/) {
-            make TAP::Sub-Test.new(:raw(~$/), :entries(@<sub-entry>».made), |self!make_test($<test>));
-        }
-        method unknown($/) {
-            make TAP::Unknown.new(:raw(~$/));
-        }
+}
+
+class Actions {
+    method TOP($/) {
+        make $/.values[0].made;
     }
-    method parse(|c) {
-        my $*tap-indent = 0;
-        nextwith(:actions(Actions), |c);
+    method plan($/) {
+        my %args = :raw(~$/), :tests(+$<count>);
+        if $<directive> {
+            %args<skip-all explanation> = True, ~$<explanation>;
+        }
+        make TAP::Plan.new(|%args);
     }
-    method subparse(|c) {
-        my $*tap-indent = 0;
-        nextwith(:actions(Actions), |c);
+    method description($m) {
+        $m.make: ~$m.subst(/\\('#'|'\\')/, { $_[0] }, :g)
+    }
+    method !make_test($/) {
+        my %args = (:ok($<nok> eq ''));
+        %args<number> = $<num> ?? +$<num> !! Int;
+        %args<description> = $<description>.made if $<description>;
+        %args<directive> = $<directive> ?? TAP::Directive::{~$<directive>.substr(0,4).tclc} !! TAP::No-Directive;
+        %args<explanation> = ~$<explanation> if $<explanation>;
+        %args;
+    }
+    method test($/) {
+        make TAP::Test.new(:raw(~$/), |self!make_test($/));
+    }
+    method bailout($/) {
+        make TAP::Bailout.new(:raw(~$/), :explanation($<explanation> ?? ~$<explanation> !! Str));
+    }
+    method version($/) {
+        make TAP::Version.new(:raw(~$/), :version(+$<version>));
+    }
+    method pragma-identifier($/) {
+        make $<name> => ?( $<sign> eq '+' );
+    }
+    method pragma($/) {
+        my Bool:D %identifiers = @<pragma-identifier>.map(*.ast);
+        make TAP::Pragma.new(:raw(~$/), :%identifiers);
+    }
+    method comment($/) {
+        make TAP::Comment.new(:raw(~$/), :comment(~$<comment>));
+    }
+    method yaml($/) {
+        my $serialized = $<yaml-line>.join('');
+        my $deserialized = try (require YAMLish) ?? YAMLish::load-yaml("---\n$serialized...") !! Any;
+        make TAP::YAML.new(:raw(~$/), :$serialized, :$deserialized);
+    }
+    method sub-entry($/) {
+        make $/.values[0].made;
+    }
+    method sub-test($/) {
+        make TAP::Sub-Test.new(:raw(~$/), :entries(@<sub-entry>».made), |self!make_test($<test>));
+    }
+    method unknown($/) {
+        make TAP::Unknown.new(:raw(~$/));
     }
 }
 
@@ -324,15 +317,15 @@ my sub parser(Supply $input --> Supply) {
                 } elsif $line ~~ &indented {
                     set-state(SubTest, $line);
                 } else {
-                    emit-reset $grammar.parse($line);
+                    emit-reset $grammar.parse($line, :actions(Actions));
                 }
             }
             elsif $mode == SubTest {
                 if $line ~~ &indented {
                     @buffer.push: $line;
-                } elsif $grammar.parse($line, :rule('test')) -> $test {
+                } elsif $grammar.parse($line, :rule('test'), :actions(Actions)) -> $test {
                     my $raw = (|@buffer, $line).join("\n");
-                    if $grammar.parse($raw, :rule('sub-test')) -> $subtest {
+                    if $grammar.parse($raw, :rule('sub-test'), :actions(Actions)) -> $subtest {
                         emit-reset $subtest;
                     } else {
                         emit-unknown;
@@ -347,7 +340,7 @@ my sub parser(Supply $input --> Supply) {
                     @buffer.push: $line;
                     if $<content> eq '...' {
                         my $raw = @buffer.join("\n");
-                        if $grammar.parse($raw, :rule('yaml')) -> $yaml {
+                        if $grammar.parse($raw, :rule('yaml'), :actions(Actions)) -> $yaml {
                             emit-reset $yaml;
                         } else {
                             emit-unknown;
