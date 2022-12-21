@@ -131,6 +131,6 @@ sub lex-and-get($content) {
 	my $async = $source.parse;
 	my @events;
 	$async.events.act({ @events.push: $^event });
-	await $async.waiter;
+	await $async;
 	return @events;
 }
