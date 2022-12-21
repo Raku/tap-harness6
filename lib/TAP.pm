@@ -813,7 +813,7 @@ class Source::Proc does Source {
     has $.err is required;
     has $.cwd is required;
 
-    method get-runner() {
+    method get-runner(State $state) {
         my $async = Proc::Async.new($!path, @!args);
         my $events = parser($async.stdout);
         state $devnull;
@@ -845,31 +845,35 @@ class Source::Proc does Source {
         my $process = $start.then({ my $result = $start.result; Status.new($result.exitcode, $result.signal) });
         my $start-time = now;
         my $timer = $process.then({ now - $start-time });
+        $state.listen($events);
         Run.new(:$process, :killer($async), :$timer, :$events);
     }
 }
 class Source::File does Source {
     has IO(Str) $.filename handles<slurp>;
 
-    method get-runner() {
+    method get-runner(State $state) {
         my $events = parser(supply { emit self.slurp(:close) });
+        $state.listen($events);
         Run.new(:$events);
     }
 }
 class Source::String does Source {
     has Str $.content;
 
-    method get-runner() {
+    method get-runner(State $state) {
         my $events = parser(supply { emit $!content });
+        $state.listen($events);
         Run.new(:$events);
     }
 }
 class Source::Supply does Source {
     has Supply $.supply;
 
-    method get-runner() {
+    method get-runner(State $state) {
         my $start-time = now;
         my $events = parser($!supply);
+        $state.listen($events);
         Run.new(:$events);
     }
 }
@@ -882,8 +886,7 @@ class Async {
 
     method new(Source :$source, Promise :$bailout, Bool :$loose) {
         my $state = State.new(:$bailout, :$loose);
-        my $run = $source.get-runner;
-        $state.listen($run.events);
+        my $run = $source.get-runner($state);
         Async.bless(:name($source.name), :$state, :$run);
     }
 
