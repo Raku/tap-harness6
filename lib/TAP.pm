@@ -877,52 +877,61 @@ class Source::Supply does Source {
     }
 }
 
+subset SourceHandler::Priority of Numeric where 0..1;
+
+role SourceHandler {
+    method can-handle {...};
+    method make-source {...};
+}
+
+my sub normalize-path($path, IO::Path $cwd) {
+    $path ~~ IO ?? $path.relative($cwd) !! ~$path
+}
+
+class SourceHandler::Raku does SourceHandler {
+    has Str:D $.path = $*EXECUTABLE.absolute;
+    has @.incdirs;
+    method make-source(Str:D $name, Any:D :$err, IO::Path:D :$cwd, :@include-dirs = (), *%) {
+        my @dirs = flat @include-dirs, @!incdirs;
+        my @args = |@dirs.map({ "-I" ~ normalize-path($^dir, $cwd) }), $name;
+        TAP::Source::Proc.new(:$name, :$!path, :@args, :$err, :$cwd);
+    }
+    method can-handle(Str $name) {
+        0.5;
+    }
+}
+
+class SourceHandler::Exec does SourceHandler {
+    has @.args;
+    has SourceHandler::Priority $.priority = 1;
+    method new (*@args) {
+        self.bless(:@args);
+    }
+    method can-handle(Str $name) {
+        $!priority;
+    }
+    method make-source(Str:D $name, Any:D :$err, IO::Path:D :$cwd, *%) {
+        my ($path, *@args) = @!args ?? (|@!args, $name) !! ~$cwd.add($name);
+        TAP::Source::Proc.new(:$name, :$path, :@args, :$err, :$cwd);
+    }
+}
+
+class SourceHandler::File does SourceHandler {
+    method can-handle(Str $name) {
+        $name ~~ /\.tap$/ ?? 1 !! 0;
+    }
+    method make-source(Str:D $name, Any:D :$err, IO::Path:D :$cwd, *%) {
+        my $filename = $cwd.add($name);
+        TAP::Source::File.new(:$name, :$filename);
+    }
+}
+
 class Harness {
-    subset Priority of Numeric where 0..1;
-    role SourceHandler {
-        method can-handle {...};
-        method make-source {...};
-    }
-    my sub normalize-path($path, IO::Path $cwd) {
-        $path ~~ IO ?? $path.relative($cwd) !! ~$path
-    }
-    class SourceHandler::Raku does SourceHandler {
-        has Str:D $.path = $*EXECUTABLE.absolute;
-        has @.incdirs;
-        method make-source(Str:D $name, Any:D :$err, IO::Path:D :$cwd, :@include-dirs = (), *%) {
-            my @dirs = flat @include-dirs, @!incdirs;
-            my @args = |@dirs.map({ "-I" ~ normalize-path($^dir, $cwd) }), $name;
-            TAP::Source::Proc.new(:$name, :$!path, :@args, :$err, :$cwd);
-        }
-        method can-handle(Str $name) {
-            0.5;
-        }
-    }
-    class SourceHandler::Perl6 is SourceHandler::Raku {
-        # This may later give deprecation warnings
-    }
-    class SourceHandler::Exec does SourceHandler {
-        has @.args;
-        has Priority $.priority = 1;
-        method new (*@args) {
-            self.bless(:@args);
-        }
-        method can-handle(Str $name) {
-            $!priority;
-        }
-        method make-source(Str:D $name, Any:D :$err, IO::Path:D :$cwd, *%) {
-            my ($path, *@args) = @!args ?? (|@!args, $name) !! ~$cwd.add($name);
-            TAP::Source::Proc.new(:$name, :$path, :@args, :$err, :$cwd);
-        }
-    }
-    class SourceHandler::File does SourceHandler {
-        method can-handle(Str $name) {
-            $name ~~ /\.tap$/ ?? 1 !! 0;
-        }
-        method make-source(Str:D $name, Any:D :$err, IO::Path:D :$cwd, *%) {
-            my $filename = $cwd.add($name);
-            TAP::Source::File.new(:$name, :$filename);
-        }
+    # Backwards compatibility
+    class SourceHandler {
+        constant Raku = TAP::SourceHandler::Raku;
+        constant Perl6 = TAP::SourceHandler::Raku; # will be removed later
+        constant Exec = TAP::SourceHandler::Exec;
     }
 
     my sub load-reporter(Str $name --> Reporter) {
@@ -935,7 +944,7 @@ class Harness {
 
     subset OutVal where any(IO::Handle:D, Supplier:D);
 
-    has SourceHandler @.handlers = ( SourceHandler::Raku.new, SourceHandler::File.new );
+    has TAP::SourceHandler @.handlers = ( SourceHandler::Raku.new, TAP::SourceHandler::File.new );
     has IO::Handle $.handle = $*OUT;
     has OutVal $.output = $!handle;
     has Formatter::Volume $.volume = ?%*ENV<HARNESS_VERBOSE> ?? Verbose !! Normal;
