@@ -684,6 +684,10 @@ my class State does TAP::Entry::Handler {
     has Int $!version;
     has Bool $.loose;
 
+    submethod TWEAK(Supply :$events) {
+        self.listen($events);
+    }
+
     proto method handle-entry(TAP::Entry $entry) {
         if $!seen-plan == After && $entry !~~ TAP::Comment {
             self!add-error("Got line $entry after late plan");
@@ -835,8 +839,7 @@ class Source::Proc does Source {
                 die "Unknown error handler";
             }
         }
-        my $state = State.new(:$bailout, :$loose);
-        $state.listen($events);
+        my $state = State.new(:$bailout, :$loose, :$events);
         my $start = $async.start(:$!cwd);
         my $process = $start.then({ my $result = $start.result; Status.new($result.exitcode, $result.signal) });
         my $start-time = now;
@@ -849,8 +852,7 @@ class Source::File does Source {
 
     method parse(Promise :$bailout, Bool :$loose) {
         my $events = parse-stream(supply { emit self.slurp(:close) });
-        my $state = State.new(:$bailout, :$loose);
-        $state.listen($events);
+        my $state = State.new(:$bailout, :$loose, :$events);
         Parser.new(:$!name, :$state, :$events);
     }
 }
@@ -859,8 +861,7 @@ class Source::String does Source {
 
     method parse(Promise :$bailout, Bool :$loose) {
         my $events = parse-stream(supply { emit $!content });
-        my $state = State.new(:$bailout, :$loose);
-        $state.listen($events);
+        my $state = State.new(:$bailout, :$loose, :$events);
         Parser.new(:$!name, :$state, :$events);
     }
 }
@@ -870,8 +871,7 @@ class Source::Supply does Source {
     method parse(Promise :$bailout, Bool :$loose) {
         my $start-time = now;
         my $events = parse-stream($!supply);
-        my $state = State.new(:$bailout, :$loose);
-        $state.listen($events);
+        my $state = State.new(:$bailout, :$loose, :$events);
         my $timer = $events.Promise.then( -> $ { now - $start-time });
         Parser.new(:$!name, :$state, :$events, :$timer);
     }
