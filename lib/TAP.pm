@@ -775,19 +775,16 @@ my class State does TAP::Entry::Handler {
     }
 }
 
-my class Run {
+class Parser does Awaitable {
     subset Killable of Any where { .can('kill') };
+
+    has Str $.name;
     has Supply:D $.events is required;
-    my sub get-finished(Supply $supply) {
-        my $result = Promise.new;
-        my &done = -> { $result.keep(Status.new(0, 0)) };
-        my &quit = -> $reason { $result.keep(Status.new(255, 0)) };
-        $supply.tap(-> $ {}, :&done, :&quit);
-        $result;
-    }
-    has Promise:D $.process = get-finished($!events);
+    has Promise:D $.process = $!events.Promise.then({ Status.new($^promise.status ~~ Kept ?? 0 !! 255, 0) });
     has Killable $!killer;
     has Promise $!timer;
+    has State $!state is built;
+    has Promise $.waiter is built(False) handles <result get-await-handle> = Promise.allof($!state.done, $!process).then({ $!state.finalize($!name, self.exit-status, self.time) });
 
     method kill() {
         $!killer.kill if $!process;
@@ -800,17 +797,9 @@ my class Run {
     }
 }
 
-class Parser { ... }
-
 role Source {
     has Str $.name = '';
-    method get-runner() { ... }
-
-    method parse(Promise :$bailout, Bool :$loose) {
-        my $state = State.new(:$bailout, :$loose);
-        my $run = self.get-runner($state);
-        Parser.new(:$!name, :$state, :$run);
-    }
+    method parse(Promise :$bailout, Bool :$loose) { ... }
 }
 class Source::Proc does Source {
     has Str $.path is required;
@@ -818,7 +807,7 @@ class Source::Proc does Source {
     has $.err is required;
     has $.cwd is required;
 
-    method get-runner(State $state) {
+    method parse(Promise :$bailout, Bool :$loose) {
         my $async = Proc::Async.new($!path, @!args);
         my $events = parse-stream($async.stdout);
         state $devnull;
@@ -846,49 +835,46 @@ class Source::Proc does Source {
                 die "Unknown error handler";
             }
         }
+        my $state = State.new(:$bailout, :$loose);
         $state.listen($events);
         my $start = $async.start(:$!cwd);
         my $process = $start.then({ my $result = $start.result; Status.new($result.exitcode, $result.signal) });
         my $start-time = now;
         my $timer = $process.then({ now - $start-time });
-        Run.new(:$process, :killer($async), :$timer, :$events);
+        Parser.new(:$!name, :$state, :$process, :killer($async), :$timer, :$events);
     }
 }
 class Source::File does Source {
     has IO(Str) $.filename handles<slurp>;
 
-    method get-runner(State $state) {
+    method parse(Promise :$bailout, Bool :$loose) {
         my $events = parse-stream(supply { emit self.slurp(:close) });
+        my $state = State.new(:$bailout, :$loose);
         $state.listen($events);
-        Run.new(:$events);
+        Parser.new(:$!name, :$state, :$events);
     }
 }
 class Source::String does Source {
     has Str $.content;
 
-    method get-runner(State $state) {
+    method parse(Promise :$bailout, Bool :$loose) {
         my $events = parse-stream(supply { emit $!content });
+        my $state = State.new(:$bailout, :$loose);
         $state.listen($events);
-        Run.new(:$events);
+        Parser.new(:$!name, :$state, :$events);
     }
 }
 class Source::Supply does Source {
     has Supply $.supply;
 
-    method get-runner(State $state) {
+    method parse(Promise :$bailout, Bool :$loose) {
         my $start-time = now;
         my $events = parse-stream($!supply);
+        my $state = State.new(:$bailout, :$loose);
         $state.listen($events);
         my $timer = $events.Promise.then( -> $ { now - $start-time });
-        Run.new(:$events, :$timer);
+        Parser.new(:$!name, :$state, :$events, :$timer);
     }
-}
-
-class Parser does Awaitable {
-    has Str $.name;
-    has Run $!run handles <kill events> is built;
-    has State $!state is built;
-    has Promise $.waiter is built(False) handles <result get-await-handle> = Promise.allof($!state.done, $!run.process).then({ $!state.finalize($!name, $!run.exit-status, $!run.time) });
 }
 
 class Harness {
