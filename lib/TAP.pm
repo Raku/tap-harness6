@@ -810,7 +810,7 @@ class Parser does Awaitable {
 
 role Source {
     has Str $.name = '';
-    method parse(Promise :$bailout, Bool :$loose) { ... }
+    method parse(Promise :$bailout, Bool :$loose, :@handlers) { ... }
 }
 class Source::Proc does Source {
     has Str $.path is required;
@@ -818,7 +818,7 @@ class Source::Proc does Source {
     has $.err is required;
     has $.cwd is required;
 
-    method parse(Promise :$bailout, Bool :$loose) {
+    method parse(Promise :$bailout, Bool :$loose, :@handlers) {
         my $async = Proc::Async.new($!path, @!args);
         my $events = parse-stream($async.stdout);
         state $devnull;
@@ -847,6 +847,7 @@ class Source::Proc does Source {
             }
         }
         my $state = State.new(:$bailout, :$loose, :$events);
+        .listen($events) for @handlers;
         my $start = $async.start(:$!cwd);
         my $process = $start.then({ my $result = $start.result; Status.new($result.exitcode, $result.signal) });
         my $start-time = now;
@@ -857,28 +858,31 @@ class Source::Proc does Source {
 class Source::File does Source {
     has IO(Str) $.filename handles<slurp>;
 
-    method parse(Promise :$bailout, Bool :$loose) {
+    method parse(Promise :$bailout, Bool :$loose, :@handlers) {
         my $events = parse-stream(supply { emit self.slurp(:close) });
         my $state = State.new(:$bailout, :$loose, :$events);
+        .listen($events) for @handlers;
         Parser.new(:$!name, :$state, :$events);
     }
 }
 class Source::String does Source {
     has Str $.content;
 
-    method parse(Promise :$bailout, Bool :$loose) {
+    method parse(Promise :$bailout, Bool :$loose, :@handlers) {
         my $events = parse-stream(supply { emit $!content });
         my $state = State.new(:$bailout, :$loose, :$events);
+        .listen($events) for @handlers;
         Parser.new(:$!name, :$state, :$events);
     }
 }
 class Source::Supply does Source {
     has Supply $.supply;
 
-    method parse(Promise :$bailout, Bool :$loose) {
+    method parse(Promise :$bailout, Bool :$loose, :@handlers) {
         my $start-time = now;
         my $events = parse-stream($!supply);
         my $state = State.new(:$bailout, :$loose, :$events);
+        .listen($events) for @handlers;
         my $timer = $events.Promise.then( -> $ { now - $start-time });
         Parser.new(:$!name, :$state, :$events, :$timer);
     }
@@ -897,9 +901,9 @@ role SourceHandler {
         self.new.make-source($name, |%args);
     }
 
-    method make-parser(Any:D $name, Any:D :$err = 'stderr', Promise :$bailout, Bool :$loose, *%args) {
+    method make-parser(Any:D $name, Any:D :$err = 'stderr', Promise :$bailout, Bool :$loose, :@handlers, *%args) {
         my $source = self.make-source($name, :$err, |%args);
-        $source.parse(:$bailout, :$loose);
+        $source.parse(:$bailout, :$loose, :@handlers);
     }
 }
 
@@ -954,9 +958,9 @@ class SourceHandlers {
     multi method make-source(IO:D $path, IO:D(Str) :$cwd = $path.CWD, *%args) {
         self.make-source($path.relative($cwd), :$cwd, |%args);
     }
-    multi method make-parser(Any:D $path, Promise :$bailout, Bool :$loose, *%args) {
+    multi method make-parser(Any:D $path, Promise :$bailout, Bool :$loose, :@handlers, *%args) {
         my $source = self.make-source($path, |%args);
-        $source.parse(:$bailout, :$loose);
+        $source.parse(:$bailout, :$loose, :@handlers);
     }
     method COERCE($handlers) {
         self.new(:handlers($handlers.list));
@@ -1003,11 +1007,6 @@ class Harness {
 
     method make-aggregator() {
         TAP::Aggregator.new(:$!ignore-exit);
-    }
-    method add-handlers(Supply $events, Output $output) {
-        if $.volume == Verbose {
-            $output.listen($events);
-        }
     }
     my &sigint = sub { signal(SIGINT) }
 
@@ -1063,9 +1062,8 @@ class Harness {
                     my $path = normalize-path($name, $cwd);
                     my $session = $reporter.open-test($path);
                     my $source = $!handlers.make-source($path, :$err, :$cwd, |%handler-args);
-                    my $parser = $source.parse(:$bailout, :$!loose);
-                    $session.listen($parser.events);
-                    self.add-handlers($parser.events, $output);
+                    my @handlers = $session, |($!volume === Verbose ?? $output !! ());
+                    my $parser = $source.parse(:$bailout, :$!loose, :@handlers);
                     @working.push({ :$parser, :$session, :done($parser.promise) });
                     next if @working < $!jobs;
                     await Promise.anyof(@working»<done>, $bailout);
