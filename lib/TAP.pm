@@ -907,7 +907,7 @@ my sub normalize-path($path, IO::Path $cwd) {
 class SourceHandler::Raku does SourceHandler {
     has Str:D $.path = $*EXECUTABLE.absolute;
     has @.incdirs;
-    multi method make-source(Str:D $name, Any:D :$err, IO::Path:D :$cwd, :@include-dirs = (), *%) {
+    multi method make-source(Str:D $name, Any:D :$err = 'stderr', IO:D() :$cwd = $*CWD, :@include-dirs = (), *%) {
         my @dirs = flat @include-dirs, @!incdirs;
         my @args = |@dirs.map({ "-I" ~ normalize-path($^dir, $cwd) }), $name;
         TAP::Source::Proc.new(:$name, :$!path, :@args, :$err, :$cwd);
@@ -926,7 +926,7 @@ class SourceHandler::Exec does SourceHandler {
     method can-handle(Str $name) {
         $!priority;
     }
-    multi method make-source(Str:D $name, Any:D :$err, IO::Path:D :$cwd, *%) {
+    multi method make-source(Str:D $name, Any:D :$err = 'stderr', IO:D() :$cwd = $*CWD, *%) {
         my $executable = ~$cwd.add($name);
         my ($path, *@args) = @!args ?? (|@!args, $executable) !! $executable;
         TAP::Source::Proc.new(:$name, :$path, :@args, :$err, :$cwd);
@@ -937,7 +937,7 @@ class SourceHandler::File does SourceHandler {
     method can-handle(Str $name) {
         $name ~~ /\.tap$/ ?? 1 !! 0;
     }
-    multi method make-source(Str:D $name, Any:D :$err, IO::Path:D :$cwd, *%) {
+    multi method make-source(Str:D $name, IO:D() :$cwd = $*CWD, *%) {
         my $filename = $cwd.add($name);
         TAP::Source::File.new(:$name, :$filename);
     }
