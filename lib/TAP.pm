@@ -911,7 +911,8 @@ class SourceHandler::Exec does SourceHandler {
         $!priority;
     }
     method make-source(Str:D $name, Any:D :$err, IO::Path:D :$cwd, *%) {
-        my ($path, *@args) = @!args ?? (|@!args, $name) !! ~$cwd.add($name);
+        my $executable = ~$cwd.add($name);
+        my ($path, *@args) = @!args ?? (|@!args, $executable) !! $executable;
         TAP::Source::Proc.new(:$name, :$path, :@args, :$err, :$cwd);
     }
 }
