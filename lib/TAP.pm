@@ -882,6 +882,14 @@ subset SourceHandler::Priority of Numeric where 0..1;
 role SourceHandler {
     method can-handle {...};
     method make-source {...};
+
+    multi method make-parser(Str:D $name, Any:D :$err = 'stderr', IO:D(Str) :$cwd = $*CWD, Promise :$bailout, Bool :$loose, *%args) {
+        my $source = self.make-source($name, :$err, :$cwd, |%args);
+        $source.parse(:$bailout, :$loose);
+    }
+    multi method make-parser(IO:D $path, IO:D(Str) :$cwd = $path.CWD, *%args) {
+        self.make-parser($path.relative($cwd), :$cwd, |%args);
+    }
 }
 
 my sub normalize-path($path, IO::Path $cwd) {
