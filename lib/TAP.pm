@@ -888,14 +888,15 @@ subset SourceHandler::Priority of Numeric where 0..1;
 
 role SourceHandler {
     method can-handle {...};
-    method make-source {...};
 
-    multi method make-parser(Str:D $name, Any:D :$err = 'stderr', IO:D(Str) :$cwd = $*CWD, Promise :$bailout, Bool :$loose, *%args) {
+    proto method make-source(|) { * };
+    multi method make-source(IO:D $path, Any:D :$err, IO:D() :$cwd = $path.CWD, *%args) {
+        self.make-source($path.relative($cwd), :$cwd, |%args);
+    }
+
+    method make-parser(Any:D $name, Any:D :$err = 'stderr', IO:D(Str) :$cwd = $*CWD, Promise :$bailout, Bool :$loose, *%args) {
         my $source = self.make-source($name, :$err, :$cwd, |%args);
         $source.parse(:$bailout, :$loose);
-    }
-    multi method make-parser(IO:D $path, IO:D(Str) :$cwd = $path.CWD, *%args) {
-        self.make-parser($path.relative($cwd), :$cwd, |%args);
     }
 }
 
@@ -906,7 +907,7 @@ my sub normalize-path($path, IO::Path $cwd) {
 class SourceHandler::Raku does SourceHandler {
     has Str:D $.path = $*EXECUTABLE.absolute;
     has @.incdirs;
-    method make-source(Str:D $name, Any:D :$err, IO::Path:D :$cwd, :@include-dirs = (), *%) {
+    multi method make-source(Str:D $name, Any:D :$err, IO::Path:D :$cwd, :@include-dirs = (), *%) {
         my @dirs = flat @include-dirs, @!incdirs;
         my @args = |@dirs.map({ "-I" ~ normalize-path($^dir, $cwd) }), $name;
         TAP::Source::Proc.new(:$name, :$!path, :@args, :$err, :$cwd);
@@ -925,7 +926,7 @@ class SourceHandler::Exec does SourceHandler {
     method can-handle(Str $name) {
         $!priority;
     }
-    method make-source(Str:D $name, Any:D :$err, IO::Path:D :$cwd, *%) {
+    multi method make-source(Str:D $name, Any:D :$err, IO::Path:D :$cwd, *%) {
         my $executable = ~$cwd.add($name);
         my ($path, *@args) = @!args ?? (|@!args, $executable) !! $executable;
         TAP::Source::Proc.new(:$name, :$path, :@args, :$err, :$cwd);
@@ -936,7 +937,7 @@ class SourceHandler::File does SourceHandler {
     method can-handle(Str $name) {
         $name ~~ /\.tap$/ ?? 1 !! 0;
     }
-    method make-source(Str:D $name, Any:D :$err, IO::Path:D :$cwd, *%) {
+    multi method make-source(Str:D $name, Any:D :$err, IO::Path:D :$cwd, *%) {
         my $filename = $cwd.add($name);
         TAP::Source::File.new(:$name, :$filename);
     }
