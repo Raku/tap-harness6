@@ -359,7 +359,14 @@ my sub parse-stream(Supply $input --> Supply) {
     }
 }
 
-role Output {
+role Output does Entry::Handler {
+    method handle-entry(Entry $entry) {
+        self.say(~$entry)
+    }
+    method end-entries() {
+        self.flush;
+    }
+
     method print(Str $value) {
         ...
     }
@@ -995,7 +1002,7 @@ class Harness {
     }
     method add-handlers(Supply $events, Output $output) {
         if $.volume == Verbose {
-            $events.act({ $output.say(~$^entry) }, :done({ $output.flush }), :quit({ $output.flush }));
+            $output.listen($events);
         }
     }
     my &sigint = sub { signal(SIGINT) }
