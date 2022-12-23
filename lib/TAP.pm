@@ -935,6 +935,23 @@ class SourceHandler::File does SourceHandler {
     }
 }
 
+class SourceHandlers {
+    has TAP::SourceHandler @.handlers = ( SourceHandler::Raku.new, TAP::SourceHandler::File.new );
+    multi method make-source(Str:D $path, *%args) {
+        @!handlers.max(*.can-handle($path)).make-source($path, |%args)
+    }
+    multi method make-source(IO:D $path, IO:D(Str) :$cwd = $path.CWD, *%args) {
+        self.make-source($path.relative($cwd), :$cwd, |%args);
+    }
+    multi method make-parser(Any:D $path, Promise :$bailout, Bool :$loose, *%args) {
+        my $source = self.make-source($path, |%args);
+        $source.parse(:$bailout, :$loose);
+    }
+    method COERCE($handlers) {
+        self.new(:handlers($handlers.list));
+    }
+}
+
 class Harness {
     # Backwards compatibility
     class SourceHandler {
@@ -953,7 +970,7 @@ class Harness {
 
     subset OutVal where any(IO::Handle:D, Supplier:D);
 
-    has TAP::SourceHandler @.handlers = ( SourceHandler::Raku.new, TAP::SourceHandler::File.new );
+    has SourceHandlers() $.handlers = SourceHandlers.new;
     has IO::Handle $.handle = $*OUT;
     has OutVal $.output = $!handle;
     has Formatter::Volume $.volume = ?%*ENV<HARNESS_VERBOSE> ?? Verbose !! Normal;
@@ -1034,7 +1051,7 @@ class Harness {
                 for @names -> $name {
                     my $path = normalize-path($name, $cwd);
                     my $session = $reporter.open-test($path);
-                    my $source = @!handlers.max(*.can-handle($path)).make-source($path, :$err, :$cwd, |%handler-args);
+                    my $source = $!handlers.make-source($path, :$err, :$cwd, |%handler-args);
                     my $parser = $source.parse(:$bailout, :$!loose);
                     $session.listen($parser.events);
                     self.add-handlers($parser.events, $output);
