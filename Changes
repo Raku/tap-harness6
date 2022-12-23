@@ -1,6 +1,8 @@
 Revision history for TAP
 
 {{$NEXT}}
+
+0.3.9  2022-12-23T14:03:54+01:00
         - Added a SourceHandler::File
         - Make TAP::Grammar public
         - Renamed Async to Parser
