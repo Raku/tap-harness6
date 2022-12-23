@@ -795,7 +795,7 @@ class Parser does Awaitable {
     has Killable $!killer;
     has Promise $!timer;
     has State $!state is built;
-    has Promise $.waiter is built(False) handles <result get-await-handle> = Promise.allof($!state.done, $!process).then({ $!state.finalize($!name, self.exit-status, self.time) });
+    has Promise $.promise is built(False) handles <result get-await-handle> = Promise.allof($!state.done, $!process).then({ $!state.finalize($!name, self.exit-status, self.time) });
 
     method kill() {
         $!killer.kill if $!process;
@@ -993,7 +993,7 @@ class Harness {
     has Bool $.color;
 
     class Run does Awaitable {
-        has Promise $!waiter handles <result get-await-handle> is built;
+        has Promise $!promise handles <result get-await-handle> is built;
         has Promise $!bailout is built handles :kill<break>;
     }
 
@@ -1051,7 +1051,7 @@ class Harness {
         my $reporter = $reporter-class.new(:$output, :$formatter);
 
         my @working;
-        my $waiter = start {
+        my $promise = start {
             my $int = $!trap ?? sigint().tap({ $bailout.break("Interrupted"); $int.close(); }) !! Tap;
             my $begin = now;
             try {
@@ -1062,7 +1062,7 @@ class Harness {
                     my $parser = $source.parse(:$bailout, :$!loose);
                     $session.listen($parser.events);
                     self.add-handlers($parser.events, $output);
-                    @working.push({ :$parser, :$session, :done($parser.waiter) });
+                    @working.push({ :$parser, :$session, :done($parser.promise) });
                     next if @working < $!jobs;
                     await Promise.anyof(@working»<done>, $bailout);
                     reap-finished();
@@ -1094,7 +1094,7 @@ class Harness {
             }
             @working = @new-working;
         }
-        Run.new(:$waiter, :$bailout);
+        Run.new(:$promise, :$bailout);
     }
 }
 
