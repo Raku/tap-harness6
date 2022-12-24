@@ -126,7 +126,5 @@ sub parse-and-get($content, :$tests-planned, :$tests-run, :$passed, :$failed, :$
 }
 
 sub lex-and-get($content) {
-	my $source = TAP::Source::String.new(:$content);
-	my @events = $source.parse.events.list;
-	return @events;
+	TAP::Grammar.parse($content, :actions(TAP::Actions)).made;
 }

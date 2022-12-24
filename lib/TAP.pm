@@ -790,8 +790,8 @@ class Parser does Awaitable {
     subset Killable of Any where { .can('kill') };
 
     has Str $.name;
-    has Supply:D $.events is required;
-    has Promise:D $.process = $!events.Promise.then({ Status.new($^promise.status ~~ Kept ?? 0 !! 255, 0) });
+    has Supply:D $!events is required is built;
+    has Promise:D $!process is built = $!events.Promise.then({ Status.new($^promise.status ~~ Kept ?? 0 !! 255, 0) });
     has Killable $!killer;
     has Promise $!timer;
     has State $!state is built;
