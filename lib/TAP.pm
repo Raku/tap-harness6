@@ -89,21 +89,21 @@ class Status {
 }
 
 class Result {
-    has Str $.name;
-    has Int $.tests-planned;
-    has Int $.tests-run;
-    has Int $.passed;
-    has Int @.failed;
-    has Str @.errors;
-    has Int $.actual-passed;
-    has Int $.actual-failed;
-    has Int $.todo;
-    has Int @.todo-passed;
-    has Int $.skipped;
-    has Int $.unknowns;
-    has Bool $.skip-all;
-    has Status $.exit-status handles <exit signal wait>;
-    has Duration $.time;
+    has Str:D $.name is required;
+    has Int:_ $.tests-planned is required;
+    has Int:D $.tests-run is required;
+    has Int:D $.passed is required;
+    has Int:D @.failed is required;
+    has Str:D @.errors is required;
+    has Int:D $.actual-passed is required;
+    has Int:D $.actual-failed is required;
+    has Int:D $.todo is required;
+    has Int:D @.todo-passed is required;
+    has Int:D $.skipped is required;
+    has Int:D $.unknowns is required;
+    has Bool:D $.skip-all is required;
+    has Status $.exit-status handles <exit signal wait> is required;
+    has Duration $.time is required;
 
     method has-problems($ignore-exit = False) {
         so @!failed || @!errors || (!$ignore-exit && $!exit-status.wait);
@@ -111,21 +111,22 @@ class Result {
 }
 
 class Aggregator {
-    has Result %!results-for;
-    has Str @!parse-order;
+    has Result:D %!results-for is built(False);
+    has Str:D @!parse-order is built(False);
 
-    has Int $.tests-planned = 0;
-    has Int $.tests-run = 0;
-    has Int $.passed = 0;
-    has Int $.failed = 0;
-    has Int $.errors = 0;
-    has Int $.actual-passed = 0;
-    has Int $.actual-failed = 0;
-    has Int $.todo = 0;
-    has Int $.todo-passed = 0;
-    has Int $.skipped = 0;
-    has Int $.exit-failed = 0;
-    has Bool $.ignore-exit = False;
+    has Int:D $.tests-planned is built(False) = 0;
+    has Int:D $.tests-run is built(False) = 0;
+    has Int:D $.passed is built(False) = 0;
+    has Int:D $.failed is built(False) = 0;
+    has Int:D $.errors is built(False) = 0;
+    has Int:D $.actual-passed is built(False) = 0;
+    has Int:D $.actual-failed is built(False) = 0;
+    has Int:D $.todo is built(False) = 0;
+    has Int:D $.todo-passed is built(False) = 0;
+    has Int:D $.skipped is built(False) = 0;
+    has Int:D $.exit-failed is built(False) = 0;
+
+    has Bool:D $.ignore-exit = False;
 
     method add-result(Result $result) {
         my $description = $result.name;
