@@ -10,8 +10,7 @@ class Version does Entry {
 }
 class Plan does Entry {
     has Int:D $.tests is required;
-    has Bool $.skip-all;
-    has Str $.explanation;
+    has Str $.explanation handles :skip-all<defined>;
 }
 
 enum Directive <No-Directive Skip Todo>;
@@ -237,7 +236,7 @@ class Actions {
     method plan($/) {
         my %args = :raw(~$/), :tests(+$<count>);
         if $<directive> {
-            %args<skip-all explanation> = True, ~$<explanation>;
+            %args<explanation> = ~$<explanation>;
         }
         make TAP::Plan.new(|%args);
     }
