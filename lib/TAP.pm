@@ -983,9 +983,6 @@ class Harness {
         has Promise $!bailout is built handles :kill<break>;
     }
 
-    method make-aggregator() {
-        TAP::Aggregator.new(:$!ignore-exit);
-    }
     my &sigint = sub { signal(SIGINT) }
 
     my multi make-output(IO::Handle:D $handle) {
@@ -1024,7 +1021,7 @@ class Harness {
 
     method run(*@names, IO(Str) :$cwd = $*CWD, OutVal :$out = $!output, ErrValue :$err = $!err, *%handler-args) {
         my $bailout = Promise.new;
-        my $aggregator = self.make-aggregator;
+        my $aggregator = TAP::Aggregator.new(:$!ignore-exit);
         my $output = make-output($out);
         my $formatter-class = get-color($!color, %!env-options, $output) ?? Formatter::Color !! Formatter::Text;
         my $formatter = $formatter-class.new(:@names, :$!volume, :$!timer, :$!ignore-exit);
