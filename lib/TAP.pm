@@ -1000,18 +1000,18 @@ class Harness {
         }
     }
 
-    my sub get-color(Bool $color, %env-options, Output $output) {
-        with $color {
-            return $color;
-        } orwith %env-options<c> {
-            return True;
+    method !get-color(Output $output) {
+        with $!color {
+            $!color;
+        } orwith %!env-options<c> {
+            True;
         } orwith %*ENV<HARNESS_COLOR> {
-            return ?%*ENV<HARNESS_COLOR>;
+            ?%*ENV<HARNESS_COLOR>;
         } orwith %*ENV<NO_COLOR> {
-            return False;
+            False;
         } else {
             state @safe-terminals = <xterm eterm vte konsole color>;
-            return $output.terminal && (%*ENV<TERM> // '') ~~ / @safe-terminals /;
+            $output.terminal && (%*ENV<TERM> // '') ~~ / @safe-terminals /;
         }
     }
 
@@ -1019,7 +1019,7 @@ class Harness {
         my $bailout = Promise.new;
         my $aggregator = TAP::Aggregator.new(:$!ignore-exit);
         my $output = make-output($out);
-        my $formatter-class = get-color($!color, %!env-options, $output) ?? Formatter::Color !! Formatter::Text;
+        my $formatter-class = self!get-color($output) ?? Formatter::Color !! Formatter::Text;
         my $formatter = $formatter-class.new(:@names, :$!volume, :$!timer, :$!ignore-exit);
         my $reporter-class = self!get-reporter($output);
         my $reporter = $reporter-class.new(:$output, :$formatter);
