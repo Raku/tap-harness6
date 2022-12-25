@@ -66,10 +66,14 @@ class Unknown does Entry {
 
 my role Entry::Handler {
     method handle-entry(Entry) { ... }
+    method fail-entries($ex) {
+        self.end-entries;
+    }
     method end-entries() { }
     method listen(Supply $supply) {
         my $act = { self.handle-entry($^entry) };
-        my $done = my $quit = { self.end-entries() };
+        my $done = { self.end-entries };
+        my $quit = { self.fail-entries($^ex) };
         $supply.act($act, :$done, :$quit);
     }
 }
@@ -738,6 +742,9 @@ my class State does TAP::Entry::Handler {
     multi method handle-entry(TAP::Entry $entry) {
     }
 
+    method fail-entries($ex) {
+        $!done.break($ex);
+    }
     method end-entries() {
         if $!seen-plan == Unseen {
             self!add-error('No plan found in TAP output');
@@ -748,6 +755,7 @@ my class State does TAP::Entry::Handler {
         $!done.keep;
     }
     method finalize(Str $name, Status $exit-status, Duration $time) {
+        $!done.cause.rethrow if $!done.status ~~ Broken;
         TAP::Result.new(:$name, :$!tests-planned, :$!tests-run, :$!passed, :@!failed, :@!errors, :$!skip-all,
             :$!actual-passed, :$!actual-failed, :$!todo, :@!todo-passed, :$!skipped, :$!unknowns, :$exit-status, :$time);
     }
