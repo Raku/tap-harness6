@@ -953,14 +953,6 @@ class Harness {
         constant Exec = TAP::SourceHandler::Exec;
     }
 
-    my sub load-reporter(Str $name --> Reporter) {
-        my $classname = $name.subst('-', '::', :g);
-        my $loaded = try ::($classname);
-        return $loaded if $loaded !eqv Any;
-        require ::($classname);
-        return ::($classname);
-    }
-
     subset OutVal where any(IO::Handle:D, Supplier:D);
 
     has SourceHandlers() $.handlers = SourceHandlers.new;
@@ -992,15 +984,19 @@ class Harness {
         return Output::Supplier.new(:$supplier);
     }
 
-    my sub get-reporter(Reporter $reporter-class, %env-options, $output, $volume) {
-        if $reporter-class !=== Reporter {
-            return $reporter-class;
-        } elsif %env-options<r> {
-            return load-reporter(%env-options<r>);
-        } elsif $output.terminal && $volume < Verbose {
-            return TAP::Reporter::Console;
+    method !get-reporter(Output $output) {
+        if $!reporter-class !=== Reporter {
+            $!reporter-class;
+        } elsif %!env-options<r> {
+            my $classname = %!env-options<r>.subst('-', '::', :g);
+            my $loaded = try ::($classname);
+            return $loaded if $loaded !eqv Any;
+            require ::($classname);
+            ::($classname);
+        } elsif $output.terminal && $!volume < Verbose {
+            TAP::Reporter::Console;
         } else {
-            return TAP::Reporter::Text;
+            TAP::Reporter::Text;
         }
     }
 
@@ -1025,7 +1021,7 @@ class Harness {
         my $output = make-output($out);
         my $formatter-class = get-color($!color, %!env-options, $output) ?? Formatter::Color !! Formatter::Text;
         my $formatter = $formatter-class.new(:@names, :$!volume, :$!timer, :$!ignore-exit);
-        my $reporter-class = get-reporter($!reporter-class, %!env-options, $output, $!volume);
+        my $reporter-class = self!get-reporter($output);
         my $reporter = $reporter-class.new(:$output, :$formatter);
 
         my @working;
