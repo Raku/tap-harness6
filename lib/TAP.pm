@@ -167,11 +167,11 @@ class Aggregator {
 }
 
 grammar Grammar {
-    token TOP { [ <entry> \n ]+ }
+    token TOP { <entry>+ }
     token sp { <[\s] - [\n]> }
     token num { <[0..9]>+ }
     token entry {
-        ^^ [ <plan> | <test> | <bailout> | <version> | <comment> | <pragma> | <yaml> | <sub-test> || <unknown> ] $$
+        ^^ [ <plan> | <test> | <bailout> | <version> | <comment> | <pragma> | <yaml> | <sub-test> || <unknown> ] \n
     }
     token plan {
         '1..' <count=.num> <.sp>* [
@@ -292,70 +292,40 @@ my sub parse-stream(Supply $input --> Supply) {
         enum Mode <Normal SubTest Yaml >;
         my Mode $mode = Normal;
         my Str @buffer;
-        sub set-state(Mode $new, Str $line) {
-            $mode = $new;
-            @buffer = $line;
-        }
-        sub emit-unknown(*@more) {
-            @buffer.append: @more;
-            for @buffer -> $raw {
-                emit Unknown.new(:$raw);
+        my $grammar = Grammar.new;
+
+        sub emit-reset($line) {
+            for $grammar.parse($line, :actions(Actions)).made -> $entry {
+                emit $entry;
             }
             @buffer = ();
             $mode = Normal;
         }
-        sub emit-reset(Match $entry) {
-            emit $entry.made;
-            @buffer = ();
-            $mode = Normal;
-        }
 
-        my token indented { ^ '    ' }
-
-        my $grammar = Grammar.new;
-
-        whenever $input.lines -> $line {
+        whenever $input.lines(:!chomp) -> $line {
             if $mode == Normal {
-                if $line ~~ / ^ '  ---' / {
-                    set-state(Yaml, $line);
-                } elsif $line ~~ &indented {
-                    set-state(SubTest, $line);
+                if $line.starts-with('  ---') {
+                    ($mode, @buffer) = (Yaml, $line);
+                } elsif $line.starts-with('    ') {
+                    ($mode, @buffer) = (SubTest, $line);
                 } else {
-                    emit-reset $grammar.parse($line, :rule('entry'), :actions(Actions));
+                    emit-reset $line;
                 }
             }
             elsif $mode == SubTest {
-                if $line ~~ &indented {
-                    @buffer.push: $line;
-                } elsif $grammar.parse($line, :rule('test'), :actions(Actions)) -> $test {
-                    my $raw = (|@buffer, $line).join("\n");
-                    if $grammar.parse($raw, :rule('sub-test'), :actions(Actions)) -> $subtest {
-                        emit-reset $subtest;
-                    } else {
-                        emit-unknown;
-                        emit-reset $test;
-                    }
-                } else {
-                    emit-unknown $line;
+                @buffer.push: $line;
+                if not $line.starts-with('    ') {
+                    emit-reset @buffer.join('');
                 }
             }
             elsif $mode == Yaml {
-                if $line ~~ / ^ '  '  $<content>=[\N*] $ / {
-                    @buffer.push: $line;
-                    if $<content> eq '...' {
-                        my $raw = @buffer.join("\n");
-                        if $grammar.parse($raw, :rule('yaml'), :actions(Actions)) -> $yaml {
-                            emit-reset $yaml;
-                        } else {
-                            emit-unknown;
-                        }
-                    }
-                } else {
-                    emit-unknown $line;
+                @buffer.push: $line;
+                if not $line.starts-with('  ') or $line eq "  ...\n" {
+                    emit-reset @buffer.join('');
                 }
             }
         }
-        LEAVE { emit-unknown }
+        LEAVE { emit-reset @buffer.join('') if @buffer }
     }
 }
 
