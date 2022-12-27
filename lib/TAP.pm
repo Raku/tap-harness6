@@ -285,7 +285,32 @@ class Actions {
     }
 }
 
-my sub parse-stream(Supply $input --> Supply) {
+role Output {
+    method print(Str $value) {
+        ...
+    }
+    method say(Str $value) {
+        self.print($value ~ "\n");
+    }
+    method flush() {
+    }
+    method terminal() {
+        False;
+    }
+}
+
+class Output::Handle does Output {
+    has IO::Handle:D $.handle handles(:print<print>, :flush<flush>, :terminal<t>) = $*OUT;
+}
+
+class Output::Supplier does Output {
+    has Supplier:D $.supplier is required;
+    method print(Str $value) {
+        $!supplier.emit($value);
+    }
+}
+
+my sub parse-stream(Supply $input, Output $output --> Supply) {
     supply {
         enum Mode <Normal SubTest Yaml >;
         my Mode $mode = Normal;
@@ -301,6 +326,8 @@ my sub parse-stream(Supply $input --> Supply) {
         }
 
         whenever $input.lines(:!chomp) -> $line {
+            $output.print($line) with $output;
+
             if $mode == Normal {
                 if $line.starts-with('  ---') {
                     ($mode, @buffer) = (Yaml, $line);
@@ -323,39 +350,7 @@ my sub parse-stream(Supply $input --> Supply) {
                 }
             }
         }
-        LEAVE { emit-reset @buffer.join('') if @buffer }
-    }
-}
-
-role Output does Entry::Handler {
-    method handle-entry(Entry $entry) {
-        self.say(~$entry)
-    }
-    method end-entries() {
-        self.flush;
-    }
-
-    method print(Str $value) {
-        ...
-    }
-    method say(Str $value) {
-        self.print($value ~ "\n");
-    }
-    method flush() {
-    }
-    method terminal() {
-        False;
-    }
-}
-
-class Output::Handle does Output {
-    has IO::Handle:D $.handle handles(:print<print>, :flush<flush>, :terminal<t>) = $*OUT;
-}
-
-class Output::Supplier does Output {
-    has Supplier:D $.supplier is required;
-    method print(Str $value) {
-        $!supplier.emit($value);
+        LEAVE { emit-reset @buffer.join('') if @buffer; $output.flush with $output }
     }
 }
 
@@ -788,16 +783,16 @@ class Parser does Awaitable {
 
 role Source {
     has Str $.name = '';
-    method parse(Promise :$bailout, Bool :$loose, :@handlers) { ... }
+    method parse(Promise :$bailout, Bool :$loose, :@handlers, Output :$output) { ... }
 }
 class Source::Proc does Source {
     has Str $.path is required;
     has @.args;
     has $.cwd is required;
 
-    method parse(Promise :$bailout, Bool :$loose, :@handlers, Any :$err = 'stderr') {
+    method parse(Promise :$bailout, Bool :$loose, :@handlers, Output :$output, Any :$err = 'stderr') {
         my $async = Proc::Async.new($!path, @!args);
-        my $events = parse-stream($async.stdout);
+        my $events = parse-stream($async.stdout, $output);
         state $devnull;
         END { $devnull.close with $devnull }
         given $err {
@@ -833,8 +828,8 @@ class Source::Proc does Source {
 class Source::File does Source {
     has IO(Str) $.filename handles<slurp>;
 
-    method parse(Promise :$bailout, Bool :$loose, :@handlers) {
-        my $events = parse-stream(supply { emit self.slurp(:close) });
+    method parse(Promise :$bailout, Bool :$loose, :@handlers, Output :$output) {
+        my $events = parse-stream(supply { emit self.slurp(:close) }, $output);
         my $state = State.new(:$bailout, :$loose, :$events, :@handlers);
         Parser.new(:$!name, :$state);
     }
@@ -842,8 +837,8 @@ class Source::File does Source {
 class Source::String does Source {
     has Str $.content;
 
-    method parse(Promise :$bailout, Bool :$loose, :@handlers) {
-        my $events = parse-stream(supply { emit $!content });
+    method parse(Promise :$bailout, Bool :$loose, :@handlers, Output :$output) {
+        my $events = parse-stream(supply { emit $!content }, $output);
         my $state = State.new(:$bailout, :$loose, :$events, :@handlers);
         Parser.new(:$!name, :$state);
     }
@@ -851,9 +846,9 @@ class Source::String does Source {
 class Source::Supply does Source {
     has Supply $.supply;
 
-    method parse(Promise :$bailout, Bool :$loose, :@handlers) {
+    method parse(Promise :$bailout, Bool :$loose, Output :$output, :@handlers) {
         my $start-time = now;
-        my $events = parse-stream($!supply);
+        my $events = parse-stream($!supply, $output);
         my $state = State.new(:$bailout, :$loose, :$events, :@handlers);
         my $timer = $events.Promise.then( -> $ { now - $start-time });
         Parser.new(:$!name, :$state, :$timer);
@@ -873,9 +868,9 @@ role SourceHandler {
         self.new.make-source($name, |%args);
     }
 
-    method make-parser(Any:D $name, Promise :$bailout, Bool :$loose, :@handlers, Any:D :$err = 'stderr', *%args) {
+    method make-parser(Any:D $name, Promise :$bailout, Bool :$loose, :@handlers, Output :$output, Any:D :$err = 'stderr', *%args) {
         my $source = self.make-source($name, |%args);
-        $source.parse(:$bailout, :$loose, :$err, :@handlers);
+        $source.parse(:$bailout, :$loose, :$output, :$err, :@handlers);
     }
 }
 
@@ -930,9 +925,9 @@ class SourceHandlers {
     multi method make-source(IO:D $path, IO:D(Str) :$cwd = $path.CWD, *%args) {
         self.make-source($path.relative($cwd), :$cwd, |%args);
     }
-    multi method make-parser(Any:D $path, Promise :$bailout, Bool :$loose, :@handlers, Any:D :$err = 'stderr', *%args) {
+    multi method make-parser(Any:D $path, Promise :$bailout, Bool :$loose, :@handlers, Output :$output, Any:D :$err = 'stderr', *%args) {
         my $source = self.make-source($path, |%args);
-        $source.parse(:$bailout, :$loose, :$err, :@handlers);
+        $source.parse(:$bailout, :$loose, :$output, :$err, :@handlers);
     }
     method COERCE($handlers) {
         self.new(:handlers($handlers.list));
@@ -1027,8 +1022,8 @@ class Harness {
                     my $path = normalize-path($name, $cwd);
                     my $session = $reporter.open-test($path);
                     my $source = $!handlers.make-source($path, :$cwd, |%handler-args);
-                    my @handlers = $session, |($!volume === Verbose ?? $output !! ());
-                    my $parser = $source.parse(:$bailout, :$!loose, :$err, :@handlers);
+                    my @handlers = $session;
+                    my $parser = $source.parse(:$bailout, :$!loose, :$err, :@handlers, :output($!volume === Verbose ?? $output !! Output));
                     @working.push({ :$parser, :$session, :done($parser.promise) });
                     next if @working < $!jobs;
                     await Promise.anyof(@working»<done>, $bailout);
