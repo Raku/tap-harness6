@@ -4,6 +4,7 @@ Revision history for TAP
         - Add handlers argument to Source.parse
         - Remove events and process accessors from Parser
         - Correctly signal quit to EntryHandler
+        - Prevent double-parsing of input
 
 0.3.10  2022-12-23T15:25:22+01:00
         - Make SourceHandler usable as type-object

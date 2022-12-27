@@ -70,12 +70,6 @@ my role Entry::Handler {
         self.end-entries;
     }
     method end-entries() { }
-    method listen(Supply $supply) {
-        my $act = { self.handle-entry($^entry) };
-        my $done = { self.end-entries };
-        my $quit = { self.fail-entries($^ex) };
-        $supply.act($act, :$done, :$quit);
-    }
 }
 
 class Status {
@@ -664,9 +658,13 @@ my class State does TAP::Entry::Handler {
     has Promise $.done = Promise.new;
     has Int $!version;
     has Bool $.loose;
+    has Entry::Handler @!handlers is built;
 
     submethod TWEAK(Supply :$events) {
-        self.listen($events);
+        my $act  = { self.handle-entry($^entry) };
+        my $done = { self.end-entries };
+        my $quit = { self.fail-entries($^ex) };
+        $events.act($act, :$done, :$quit);
     }
 
     proto method handle-entry(TAP::Entry $entry) {
@@ -674,6 +672,7 @@ my class State does TAP::Entry::Handler {
             self!add-error("Got line $entry after late plan");
         }
         {*};
+        .handle-entry($entry) for @!handlers;
         $!seen-lines++;
     }
     multi method handle-entry(TAP::Version $entry) {
@@ -744,6 +743,7 @@ my class State does TAP::Entry::Handler {
 
     method fail-entries($ex) {
         $!done.break($ex);
+        .fail-entries($ex) for @!handlers;
     }
     method end-entries() {
         if $!seen-plan == Unseen {
@@ -753,6 +753,7 @@ my class State does TAP::Entry::Handler {
             self!add-error("Bad plan.  You planned $!tests-planned tests but ran $!tests-run.");
         }
         $!done.keep;
+        .end-entries for @!handlers;
     }
     method finalize(Str $name, Status $exit-status, Duration $time) {
         $!done.cause.rethrow if $!done.status ~~ Broken;
@@ -821,8 +822,7 @@ class Source::Proc does Source {
                 die "Unknown error handler";
             }
         }
-        my $state = State.new(:$bailout, :$loose, :$events);
-        .listen($events) for @handlers;
+        my $state = State.new(:$bailout, :$loose, :$events, :@handlers);
         my $start = $async.start(:$!cwd);
         my $process = $start.then({ my $result = $start.result; Status.new($result.exitcode, $result.signal) });
         my $start-time = now;
@@ -835,8 +835,7 @@ class Source::File does Source {
 
     method parse(Promise :$bailout, Bool :$loose, :@handlers) {
         my $events = parse-stream(supply { emit self.slurp(:close) });
-        my $state = State.new(:$bailout, :$loose, :$events);
-        .listen($events) for @handlers;
+        my $state = State.new(:$bailout, :$loose, :$events, :@handlers);
         Parser.new(:$!name, :$state);
     }
 }
@@ -845,8 +844,7 @@ class Source::String does Source {
 
     method parse(Promise :$bailout, Bool :$loose, :@handlers) {
         my $events = parse-stream(supply { emit $!content });
-        my $state = State.new(:$bailout, :$loose, :$events);
-        .listen($events) for @handlers;
+        my $state = State.new(:$bailout, :$loose, :$events, :@handlers);
         Parser.new(:$!name, :$state);
     }
 }
@@ -856,8 +854,7 @@ class Source::Supply does Source {
     method parse(Promise :$bailout, Bool :$loose, :@handlers) {
         my $start-time = now;
         my $events = parse-stream($!supply);
-        my $state = State.new(:$bailout, :$loose, :$events);
-        .listen($events) for @handlers;
+        my $state = State.new(:$bailout, :$loose, :$events, :@handlers);
         my $timer = $events.Promise.then( -> $ { now - $start-time });
         Parser.new(:$!name, :$state, :$timer);
     }
