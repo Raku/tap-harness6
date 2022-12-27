@@ -793,16 +793,14 @@ role Source {
 class Source::Proc does Source {
     has Str $.path is required;
     has @.args;
-    has $.err is required;
     has $.cwd is required;
 
-    method parse(Promise :$bailout, Bool :$loose, :@handlers) {
+    method parse(Promise :$bailout, Bool :$loose, :@handlers, Any :$err = 'stderr') {
         my $async = Proc::Async.new($!path, @!args);
         my $events = parse-stream($async.stdout);
         state $devnull;
         END { $devnull.close with $devnull }
-        given $!err {
-            my $err = $_;
+        given $err {
             when 'stderr' { #default is correct
             }
             when 'merge' {
@@ -872,16 +870,16 @@ role SourceHandler {
     method can-handle {...};
 
     proto method make-source(|) { * };
-    multi method make-source(IO:D $path, Any:D :$err, IO:D() :$cwd = $path.CWD, *%args) {
+    multi method make-source(IO:D $path, IO:D() :$cwd = $path.CWD, *%args) {
         self.make-source($path.relative($cwd), :$cwd, |%args);
     }
     multi method make-source(::?CLASS:U: Str:D $name, *%args) {
         self.new.make-source($name, |%args);
     }
 
-    method make-parser(Any:D $name, Any:D :$err = 'stderr', Promise :$bailout, Bool :$loose, :@handlers, *%args) {
-        my $source = self.make-source($name, :$err, |%args);
-        $source.parse(:$bailout, :$loose, :@handlers);
+    method make-parser(Any:D $name, Promise :$bailout, Bool :$loose, :@handlers, Any:D :$err = 'stderr', *%args) {
+        my $source = self.make-source($name, |%args);
+        $source.parse(:$bailout, :$loose, :$err, :@handlers);
     }
 }
 
@@ -892,10 +890,10 @@ my sub normalize-path($path, IO::Path $cwd) {
 class SourceHandler::Raku does SourceHandler {
     has Str:D $.path = $*EXECUTABLE.absolute;
     has @.incdirs;
-    multi method make-source(::?CLASS:D: Str:D $name, Any:D :$err = 'stderr', IO:D() :$cwd = $*CWD, :@include-dirs = (), *%) {
+    multi method make-source(::?CLASS:D: Str:D $name, IO:D() :$cwd = $*CWD, :@include-dirs = (), *%) {
         my @dirs = flat @include-dirs, @!incdirs;
         my @args = |@dirs.map({ "-I" ~ normalize-path($^dir, $cwd) }), $name;
-        TAP::Source::Proc.new(:$name, :$!path, :@args, :$err, :$cwd);
+        TAP::Source::Proc.new(:$name, :$!path, :@args, :$cwd);
     }
     method can-handle(Str $name) {
         0.5;
@@ -911,10 +909,10 @@ class SourceHandler::Exec does SourceHandler {
     method can-handle(Str $name) {
         $!priority;
     }
-    multi method make-source(::?CLASS:D: Str:D $name, Any:D :$err = 'stderr', IO:D() :$cwd = $*CWD, *%) {
+    multi method make-source(::?CLASS:D: Str:D $name, IO:D() :$cwd = $*CWD, *%) {
         my $executable = ~$cwd.add($name);
         my ($path, *@args) = @!args ?? (|@!args, $executable) !! $executable;
-        TAP::Source::Proc.new(:$name, :$path, :@args, :$err, :$cwd);
+        TAP::Source::Proc.new(:$name, :$path, :@args, :$cwd);
     }
 }
 
@@ -936,9 +934,9 @@ class SourceHandlers {
     multi method make-source(IO:D $path, IO:D(Str) :$cwd = $path.CWD, *%args) {
         self.make-source($path.relative($cwd), :$cwd, |%args);
     }
-    multi method make-parser(Any:D $path, Promise :$bailout, Bool :$loose, :@handlers, *%args) {
+    multi method make-parser(Any:D $path, Promise :$bailout, Bool :$loose, :@handlers, Any:D :$err = 'stderr', *%args) {
         my $source = self.make-source($path, |%args);
-        $source.parse(:$bailout, :$loose, :@handlers);
+        $source.parse(:$bailout, :$loose, :$err, :@handlers);
     }
     method COERCE($handlers) {
         self.new(:handlers($handlers.list));
@@ -1032,9 +1030,9 @@ class Harness {
                 for @names -> $name {
                     my $path = normalize-path($name, $cwd);
                     my $session = $reporter.open-test($path);
-                    my $source = $!handlers.make-source($path, :$err, :$cwd, |%handler-args);
+                    my $source = $!handlers.make-source($path, :$cwd, |%handler-args);
                     my @handlers = $session, |($!volume === Verbose ?? $output !! ());
-                    my $parser = $source.parse(:$bailout, :$!loose, :@handlers);
+                    my $parser = $source.parse(:$bailout, :$!loose, :$err, :@handlers);
                     @working.push({ :$parser, :$session, :done($parser.promise) });
                     next if @working < $!jobs;
                     await Promise.anyof(@working»<done>, $bailout);
