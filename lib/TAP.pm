@@ -768,8 +768,7 @@ class Parser does Awaitable {
     subset Killable of Any where { .can('kill') };
 
     has Str $.name;
-    has Supply:D $!events is required is built;
-    has Promise:D $!process is built = $!events.Promise.then({ Status.new($^promise.status ~~ Kept ?? 0 !! 255, 0) });
+    has Promise:D $!process is built = Promise.kept(Status);
     has Killable $!killer;
     has Promise $!timer;
     has State $!state is built;
@@ -828,7 +827,7 @@ class Source::Proc does Source {
         my $process = $start.then({ my $result = $start.result; Status.new($result.exitcode, $result.signal) });
         my $start-time = now;
         my $timer = $process.then({ now - $start-time });
-        Parser.new(:$!name, :$state, :$process, :killer($async), :$timer, :$events);
+        Parser.new(:$!name, :$state, :$process, :killer($async), :$timer);
     }
 }
 class Source::File does Source {
@@ -838,7 +837,7 @@ class Source::File does Source {
         my $events = parse-stream(supply { emit self.slurp(:close) });
         my $state = State.new(:$bailout, :$loose, :$events);
         .listen($events) for @handlers;
-        Parser.new(:$!name, :$state, :$events);
+        Parser.new(:$!name, :$state);
     }
 }
 class Source::String does Source {
@@ -848,7 +847,7 @@ class Source::String does Source {
         my $events = parse-stream(supply { emit $!content });
         my $state = State.new(:$bailout, :$loose, :$events);
         .listen($events) for @handlers;
-        Parser.new(:$!name, :$state, :$events);
+        Parser.new(:$!name, :$state);
     }
 }
 class Source::Supply does Source {
@@ -860,7 +859,7 @@ class Source::Supply does Source {
         my $state = State.new(:$bailout, :$loose, :$events);
         .listen($events) for @handlers;
         my $timer = $events.Promise.then( -> $ { now - $start-time });
-        Parser.new(:$!name, :$state, :$events, :$timer);
+        Parser.new(:$!name, :$state, :$timer);
     }
 }
 
