@@ -328,7 +328,7 @@ my sub parse-stream(Supply $input, Output $output --> Supply) {
         whenever $input.lines(:!chomp) -> $line {
             $output.print($line) with $output;
 
-            if $mode == Normal {
+            if $mode === Normal {
                 if $line.starts-with('  ---') {
                     ($mode, @buffer) = (Yaml, $line);
                 } elsif $line.starts-with('    ') {
@@ -337,13 +337,13 @@ my sub parse-stream(Supply $input, Output $output --> Supply) {
                     emit-reset $line;
                 }
             }
-            elsif $mode == SubTest {
+            elsif $mode === SubTest {
                 @buffer.push: $line;
                 if not $line.starts-with('    ') {
                     emit-reset @buffer.join('');
                 }
             }
-            elsif $mode == Yaml {
+            elsif $mode === Yaml {
                 @buffer.push: $line;
                 if not $line.starts-with('  ') or $line eq "  ...\n" {
                     emit-reset @buffer.join('');
@@ -570,7 +570,7 @@ class Reporter::Console does Reporter {
 
         sub output-ruler(Bool $refresh) {
             my $new-now = now;
-            return if $now == $new-now and !$refresh;
+            return if $now === $new-now and !$refresh;
             $now = $new-now;
             my $header = sprintf '===( %7d;%d', $!tests, $now - $start;
             my @items = @!active.map(*.summary);
@@ -603,7 +603,7 @@ class Reporter::Console does Reporter {
             output-ruler(True) if @!active.elems > 1;
         }
         multi receive('summary', TAP::Aggregator $aggregator, Bool $interrupted, Duration $duration) {
-            $!output.print($!formatter.format-summary($aggregator, $interrupted, $duration)) unless self.volume == Silent;
+            $!output.print($!formatter.format-summary($aggregator, $interrupted, $duration)) unless self.volume === Silent;
         }
 
         $!events.Supply.act(-> @args { receive(|@args) });
@@ -663,7 +663,7 @@ my class State does TAP::Entry::Handler {
     }
 
     proto method handle-entry(TAP::Entry $entry) {
-        if $!seen-plan == After && $entry !~~ TAP::Comment {
+        if $!seen-plan === After && $entry !~~ TAP::Comment {
             self!add-error("Got line $entry after late plan");
         }
         {*};
@@ -694,7 +694,7 @@ my class State does TAP::Entry::Handler {
         if $found-number.defined && ($found-number != $expected-number) {
             self!add-error("Tests out of sequence.  Found ($found-number) but expected ($expected-number)");
         }
-        if $!seen-plan == After {
+        if $!seen-plan === After {
             self!add-error("Plan must be at the beginning or end of the TAP output");
         }
 
@@ -705,9 +705,9 @@ my class State does TAP::Entry::Handler {
             @!failed.push($usable-number);
         }
         ($test.ok ?? $!actual-passed !! $!actual-failed)++;
-        $!todo++ if $test.directive == TAP::Todo;
-        @!todo-passed.push($usable-number) if $test.ok && $test.directive == TAP::Todo;
-        $!skipped++ if $test.directive == TAP::Skip;
+        $!todo++ if $test.directive === TAP::Todo;
+        @!todo-passed.push($usable-number) if $test.ok && $test.directive === TAP::Todo;
+        $!skipped++ if $test.directive === TAP::Skip;
 
         if !$!loose && $test ~~ TAP::Sub-Test {
             for $test.inconsistencies(~$usable-number) -> $error {
