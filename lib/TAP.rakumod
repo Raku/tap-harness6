@@ -765,19 +765,21 @@ class Parser does Awaitable {
 
     has Str $.name;
     has Promise:D $!process is built = Promise.kept(Status);
-    has Killable $!killer;
-    has Promise $!timer;
+    has Killable $!killer is built;
+    has Promise $!timer is built;
     has State $!state is built;
-    has Promise $.promise is built(False) handles <result get-await-handle> = Promise.allof($!state.done, $!process).then({ $!state.finalize($!name, self.exit-status, self.time) });
+    has Promise $.promise is built(False) handles <result get-await-handle> = self!build-promise;
 
+    method !build-promise() {
+        my $done = Promise.allof($!state.done, $!process);
+        $done.then({
+            my $exit-status = try { $!process.result } // Status;
+            my $time = $!timer.defined ?? $!timer.result !! Duration;
+            $!state.finalize($!name, $exit-status, $time)
+        });
+    }
     method kill() {
-        $!killer.kill if $!process;
-    }
-    method exit-status() {
-        try { $!process.result } // Status.new(255, 0);
-    }
-    method time() {
-        $!timer.defined ?? $!timer.result !! Duration;
+        $!killer.kill if $!killer;
     }
 }
 
