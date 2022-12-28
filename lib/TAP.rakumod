@@ -75,8 +75,11 @@ my role Entry::Handler {
 class Status {
     has Int $.exit;
     has Int $.signal;
-    method new(Int $exit, Int $signal) {
+    multi method new(Int $exit, Int $signal) {
         self.bless(:$exit, :$signal);
+    }
+    multi method new(Proc $proc) {
+        self.new($proc.exitcode, $proc.signal);
     }
     multi method wait(::?CLASS:D:) {
         ($!exit +< 8) +| $!signal;
@@ -821,7 +824,7 @@ class Source::Proc does Source {
         }
         my $state = State.new(:$bailout, :$loose, :$events, :@handlers);
         my $start = $async.start(:$!cwd);
-        my $process = $start.then({ my $result = $start.result; Status.new($result.exitcode, $result.signal) });
+        my $process = $start.then({ Status.new($start.result) });
         my $start-time = now;
         my $timer = $process.then({ now - $start-time });
         Parser.new(:$!name, :$state, :$process, :killer($async), :$timer);
