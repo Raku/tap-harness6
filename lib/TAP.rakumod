@@ -3,7 +3,6 @@ use v6;
 unit module TAP:ver<0.3.10>;
 
 role Entry {
-    has Str:D $.raw is required handles <Str>;
 }
 class Version does Entry {
     has Int:D $.version is required;
@@ -236,7 +235,7 @@ class Actions {
         make $/.values[0].made;
     }
     method plan($/) {
-        my %args = :raw(~$/), :tests(+$<count>);
+        my %args = :tests(+$<count>);
         if $<directive> {
             %args<explanation> = ~$<explanation>;
         }
@@ -254,37 +253,38 @@ class Actions {
         %args;
     }
     method test($/) {
-        make TAP::Test.new(:raw(~$/), |self!make_test($/));
+        make TAP::Test.new(|self!make_test($/));
     }
     method bailout($/) {
-        make TAP::Bailout.new(:raw(~$/), :explanation($<explanation> ?? ~$<explanation> !! Str));
+        make TAP::Bailout.new(:explanation($<explanation> ?? ~$<explanation> !! Str));
     }
     method version($/) {
-        make TAP::Version.new(:raw(~$/), :version(+$<version>));
+        make TAP::Version.new(:version(+$<version>));
     }
     method pragma-identifier($/) {
         make $<name> => ?( $<sign> eq '+' );
     }
     method pragma($/) {
         my Bool:D %identifiers = @<pragma-identifier>.map(*.ast);
-        make TAP::Pragma.new(:raw(~$/), :%identifiers);
+        make TAP::Pragma.new(:%identifiers);
     }
     method comment($/) {
-        make TAP::Comment.new(:raw(~$/), :comment(~$<comment>));
+        make TAP::Comment.new(:comment(~$<comment>));
     }
     method yaml($/) {
         my $serialized = $<yaml-line>.join('');
         my $deserialized = try (require YAMLish) ?? YAMLish::load-yaml("---\n$serialized...") !! Any;
-        make TAP::YAML.new(:raw(~$/), :$serialized, :$deserialized);
+        make TAP::YAML.new(:$serialized, :$deserialized);
     }
     method sub-entry($/) {
         make $/.values[0].made;
     }
     method sub-test($/) {
-        make TAP::Sub-Test.new(:raw(~$/), :entries(@<sub-entry>».made), |self!make_test($<test>));
+        my @entries = @<sub-entry>».made;
+        make TAP::Sub-Test.new(:@entries, |self!make_test($<test>));
     }
     method unknown($/) {
-        make TAP::Unknown.new(:raw(~$/));
+        make TAP::Unknown.new;
     }
 }
 
