@@ -103,7 +103,7 @@ class Result {
     has Int:D $.unknowns is required;
     has Bool:D $.skip-all is required;
     has Status $.exit-status handles <exit signal wait> is required;
-    has Duration $.time is required;
+    has Duration:D $.time is required;
 
     method has-problems($ignore-exit = False) {
         so @!failed || @!errors || (!$ignore-exit && $!exit-status.wait);
@@ -657,6 +657,7 @@ my class State does TAP::Entry::Handler {
     has Int $!version;
     has Bool $.loose;
     has Entry::Handler @!handlers is built;
+    has $!start-time = now;
 
     submethod TWEAK(Supply :$events) {
         my $act  = { self.handle-entry($^entry) };
@@ -753,7 +754,8 @@ my class State does TAP::Entry::Handler {
         $!done.keep;
         .end-entries for @!handlers;
     }
-    method finalize(Str $name, Status $exit-status, Duration $time) {
+    method finalize(Str $name, Status $exit-status) {
+        my $time = now - $!start-time;
         $!done.cause.rethrow if $!done.status ~~ Broken;
         TAP::Result.new(:$name, :$!tests-planned, :$!tests-run, :$!passed, :@!failed, :@!errors, :$!skip-all,
             :$!actual-passed, :$!actual-failed, :$!todo, :@!todo-passed, :$!skipped, :$!unknowns, :$exit-status, :$time);
@@ -769,7 +771,6 @@ class Parser does Awaitable {
     has Str $.name;
     has Promise:D $!process is built = Promise.kept(Status);
     has Killable $!killer is built;
-    has Promise $!timer is built;
     has State $!state is built;
     has Promise $.promise is built(False) handles <result get-await-handle> = self!build-promise;
 
@@ -777,8 +778,7 @@ class Parser does Awaitable {
         my $done = Promise.allof($!state.done, $!process);
         $done.then({
             my $exit-status = try { $!process.result } // Status;
-            my $time = $!timer.defined ?? $!timer.result !! Duration;
-            $!state.finalize($!name, $exit-status, $time)
+            $!state.finalize($!name, $exit-status);
         });
     }
     method kill() {
@@ -825,9 +825,7 @@ class Source::Proc does Source {
         my $state = State.new(:$bailout, :$loose, :$events, :@handlers);
         my $start = $async.start(:$!cwd);
         my $process = $start.then({ Status.new($start.result) });
-        my $start-time = now;
-        my $timer = $process.then({ now - $start-time });
-        Parser.new(:$!name, :$state, :$process, :killer($async), :$timer);
+        Parser.new(:$!name, :$state, :$process, :killer($async));
     }
 }
 class Source::File does Source {
@@ -852,11 +850,9 @@ class Source::Supply does Source {
     has Supply $.supply;
 
     method parse(Promise :$bailout, Bool :$loose, Output :$output, :@handlers) {
-        my $start-time = now;
         my $events = parse-stream($!supply, $output);
         my $state = State.new(:$bailout, :$loose, :$events, :@handlers);
-        my $timer = $events.Promise.then( -> $ { now - $start-time });
-        Parser.new(:$!name, :$state, :$timer);
+        Parser.new(:$!name, :$state);
     }
 }
 
