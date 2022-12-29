@@ -831,10 +831,10 @@ class Source::Proc does Source {
     }
 }
 class Source::File does Source {
-    has IO(Str) $.filename handles<slurp>;
+    has IO(Str) $.filename;
 
     method parse(Promise :$bailout, Bool :$loose, :@handlers, Output :$output) {
-        my $events = parse-stream(supply { emit self.slurp(:close) }, $output);
+        my $events = parse-stream(supply { emit $!filename.slurp(:close) }, $output);
         my $state = State.new(:$bailout, :$loose, :$events, :@handlers);
         Parser.new(:$!name, :$state);
     }
