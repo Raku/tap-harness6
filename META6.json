@@ -11,7 +11,7 @@
   "name": "TAP",
   "perl": "6.*",
   "provides": {
-    "TAP": "lib/TAP.pm"
+    "TAP": "lib/TAP.rakumod"
   },
   "resources": [
   ],
@@ -20,5 +20,5 @@
   ],
   "test-depends": [
   ],
-  "version": "0.3.10"
+  "version": "0.3.11"
 }

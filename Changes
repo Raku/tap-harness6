@@ -1,6 +1,8 @@
 Revision history for TAP
 
 {{$NEXT}}
+
+0.3.11  2023-01-02T16:29:11+01:00
         - Add handlers argument to Source.parse
         - Remove events and process accessors from Parser
         - Correctly signal quit to EntryHandler

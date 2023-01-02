@@ -1,6 +1,6 @@
 use v6;
 
-unit module TAP:ver<0.3.10>;
+unit module TAP:ver<0.3.11>;
 
 role Entry {
 }
