@@ -787,12 +787,12 @@ class Parser does Awaitable {
 }
 
 role Source {
-    has Str $.name = '';
+    has Str:D $.name = '';
     method parse(Promise :$bailout, Bool :$loose, :@handlers, Output :$output) { ... }
 }
 class Source::Proc does Source {
     has Str @.command is required;
-    has $.cwd is required;
+    has $.cwd = $*CWD;
     has %.env = %*ENV;
 
     method parse(Promise :$bailout, Bool :$loose, :@handlers, Output :$output, Any :$err = 'stderr') {
@@ -829,7 +829,7 @@ class Source::Proc does Source {
     }
 }
 class Source::File does Source {
-    has IO(Str) $.filename;
+    has IO::Path:D(Str) $.filename is required;
 
     method parse(Promise :$bailout, Bool :$loose, :@handlers, Output :$output) {
         my $events = parse-stream(supply { emit $!filename.slurp(:close) }, $output);
@@ -838,7 +838,7 @@ class Source::File does Source {
     }
 }
 class Source::String does Source {
-    has Str $.content;
+    has Str:D $.content is required;
 
     method parse(Promise :$bailout, Bool :$loose, :@handlers, Output :$output) {
         my $events = parse-stream(supply { emit $!content }, $output);
@@ -847,7 +847,7 @@ class Source::String does Source {
     }
 }
 class Source::Supply does Source {
-    has Supply $.supply;
+    has Supply:D $.supply is required;
 
     method parse(Promise :$bailout, Bool :$loose, Output :$output, :@handlers) {
         my $events = parse-stream($!supply, $output);
