@@ -889,8 +889,8 @@ class SourceHandler::Raku does SourceHandler {
         %env<RAKULIB> = @raku-lib.join(':');
         TAP::Source::Proc.new(:$name, :command[ $!path, $name ], :$cwd, :%env);
     }
-    method can-handle(Str $name) {
-        0.5;
+    method can-handle(IO::Path $name) {
+        $name.extension eq 't6'|'rakutest' || $name.lines.head ~~ / ^ '#1' .* [ 'raku' | 'perl6' ] / ?? 0.8 !! 0.3;
     }
 }
 
@@ -900,7 +900,7 @@ class SourceHandler::Exec does SourceHandler {
     method new (*@args) {
         self.bless(:@args);
     }
-    method can-handle(Str $name) {
+    method can-handle(IO::Path $name) {
         $!priority;
     }
     multi method make-source(::?CLASS:D: Str:D $name, IO:D() :$cwd = $*CWD, *%) {
@@ -911,8 +911,8 @@ class SourceHandler::Exec does SourceHandler {
 }
 
 class SourceHandler::File does SourceHandler {
-    method can-handle(Str $name) {
-        $name ~~ /\.tap$/ ?? 1 !! 0;
+    method can-handle(IO::Path $name) {
+        $name.extension eq 'tap' ?? 1 !! 0;
     }
     multi method make-source(::?CLASS:D: Str:D $name, IO:D() :$cwd = $*CWD, *%) {
         my $filename = $cwd.add($name);
@@ -922,11 +922,11 @@ class SourceHandler::File does SourceHandler {
 
 class SourceHandlers {
     has TAP::SourceHandler @.handlers = ( SourceHandler::Raku.new, TAP::SourceHandler::File.new );
-    multi method make-source(Str:D $path, *%args) {
-        @!handlers.max(*.can-handle($path)).make-source($path, |%args)
+    multi method make-source(Str $path, IO:D(Str) :$cwd, *%args) {
+        self.make-source(IO::Path.new($path, :CWD(~$cwd)), :$cwd, |%args);
     }
     multi method make-source(IO:D $path, IO:D(Str) :$cwd = $path.CWD, *%args) {
-        self.make-source($path.relative($cwd), :$cwd, |%args);
+        @!handlers.max(*.can-handle($path)).make-source($path.relative($cwd), :$cwd, |%args)
     }
     multi method make-parser(Any:D $path, Promise :$bailout, Bool :$loose, :@handlers, Output :$output, Any:D :$err = 'stderr', *%args) {
         my $source = self.make-source($path, |%args);
@@ -1022,9 +1022,8 @@ class Harness {
             my $begin = now;
             try {
                 for @names -> $name {
-                    my $path = normalize-path($name, $cwd);
-                    my $session = $reporter.open-test($path);
-                    my $source = $!handlers.make-source($path, :$cwd, |%handler-args);
+                    my $source = $!handlers.make-source($name, :$cwd, |%handler-args);
+                    my $session = $reporter.open-test($source.name);
                     my @handlers = $session;
                     my $parser = $source.parse(:$bailout, :$!loose, :$err, :@handlers, :output($!volume === Verbose ?? $output !! Output));
                     @working.push({ :$parser, :$session, :done($parser.promise) });
