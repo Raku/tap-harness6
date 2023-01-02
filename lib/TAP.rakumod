@@ -794,6 +794,7 @@ class Source::Proc does Source {
     has Str $.path is required;
     has @.args;
     has $.cwd is required;
+    has %.env = %*ENV;
 
     method parse(Promise :$bailout, Bool :$loose, :@handlers, Output :$output, Any :$err = 'stderr') {
         my $async = Proc::Async.new($!path, @!args);
@@ -823,7 +824,7 @@ class Source::Proc does Source {
             }
         }
         my $state = State.new(:$bailout, :$loose, :$events, :@handlers);
-        my $start = $async.start(:$!cwd);
+        my $start = $async.start(:$!cwd, :ENV(%!env));
         my $process = $start.then({ Status.new($start.result) });
         Parser.new(:$!name, :$state, :$process, :killer($async));
     }
