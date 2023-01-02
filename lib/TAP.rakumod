@@ -791,13 +791,12 @@ role Source {
     method parse(Promise :$bailout, Bool :$loose, :@handlers, Output :$output) { ... }
 }
 class Source::Proc does Source {
-    has Str $.path is required;
-    has @.args;
+    has Str @.command is required;
     has $.cwd is required;
     has %.env = %*ENV;
 
     method parse(Promise :$bailout, Bool :$loose, :@handlers, Output :$output, Any :$err = 'stderr') {
-        my $async = Proc::Async.new($!path, @!args);
+        my $async = Proc::Async.new(@!command);
         my $events = parse-stream($async.stdout, $output);
         state $devnull;
         END { $devnull.close with $devnull }
@@ -888,7 +887,7 @@ class SourceHandler::Raku does SourceHandler {
         my @normalized = map { normalize-path($^dir, $cwd) }, flat @include-dirs, @!incdirs;
         @raku-lib.prepend(@normalized);
         %env<RAKULIB> = @raku-lib.join(':');
-        TAP::Source::Proc.new(:$name, :$!path, :args($name), :$cwd, :%env);
+        TAP::Source::Proc.new(:$name, :command[ $!path, $name ], :$cwd, :%env);
     }
     method can-handle(Str $name) {
         0.5;
@@ -906,8 +905,8 @@ class SourceHandler::Exec does SourceHandler {
     }
     multi method make-source(::?CLASS:D: Str:D $name, IO:D() :$cwd = $*CWD, *%) {
         my $executable = ~$cwd.add($name);
-        my ($path, *@args) = @!args ?? (|@!args, $executable) !! $executable;
-        TAP::Source::Proc.new(:$name, :$path, :@args, :$cwd);
+        my @command = (|@!args, $executable);
+        TAP::Source::Proc.new(:$name, :@command, :$cwd);
     }
 }
 
