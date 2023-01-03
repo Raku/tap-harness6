@@ -357,7 +357,7 @@ my sub parse-stream(Supply $input, Output $output --> Supply) {
     }
 }
 
-enum Formatter::Volume <Silent Quiet Normal Verbose>;
+enum Formatter::Volume (:Silent(-2) :Quiet(-1) :Normal(0) :Verbose(1));
 role Formatter {
     has Bool:D $.timer = False;
     has Formatter::Volume $.volume = Normal;

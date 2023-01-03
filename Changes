@@ -4,6 +4,7 @@ Revision history for TAP
         - Allow environmental variables in Source::Proc
         - Use RAKULIB instead of -I for include dirs
         - Merge Source::Proc's path and args attributes into command
+        - Normalize Volume values to Normal
 
 0.3.11  2023-01-02T16:29:11+01:00
         - Add handlers argument to Source.parse
