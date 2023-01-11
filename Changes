@@ -1,6 +1,8 @@
 Revision history for TAP
 
 {{$NEXT}}
+
+0.3.12  2023-01-11T14:51:11+01:00
         - Allow environmental variables in Source::Proc
         - Use RAKULIB instead of -I for include dirs
         - Merge Source::Proc's path and args attributes into command
