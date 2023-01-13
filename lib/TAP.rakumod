@@ -883,10 +883,10 @@ class SourceHandler::Raku does SourceHandler {
     has Str:D $.path = $*EXECUTABLE.absolute;
     has @.incdirs;
     multi method make-source(::?CLASS:D: Str:D $name, IO:D() :$cwd = $*CWD, :%env is copy = %*ENV, :@include-dirs = (), *%) {
-        my @raku-lib = (%env<RAKULIB> // "").split(":", :skip-empty);
+        my @raku-lib = (%env<RAKULIB> // "").split(",", :skip-empty);
         my @normalized = map { normalize-path($^dir, $cwd) }, flat @include-dirs, @!incdirs;
         @raku-lib.prepend(@normalized);
-        %env<RAKULIB> = @raku-lib.join(':');
+        %env<RAKULIB> = @raku-lib.join(',');
         TAP::Source::Proc.new(:$name, :command[ $!path, $name ], :$cwd, :%env);
     }
     method can-handle(IO::Path $name) {
