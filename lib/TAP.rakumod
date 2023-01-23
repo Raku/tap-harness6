@@ -890,7 +890,7 @@ class SourceHandler::Raku does SourceHandler {
         TAP::Source::Proc.new(:$name, :command[ $!path, $name ], :$cwd, :%env);
     }
     method can-handle(IO::Path $name) {
-        $name.extension eq 't6'|'rakutest' || $name.lines.head ~~ / ^ '#1' .* [ 'raku' | 'perl6' ] / ?? 0.8 !! 0.3;
+        $name.extension eq 't6'|'rakutest' || $name.lines.head ~~ / ^ '#!' .* [ 'raku' | 'perl6' ] / ?? 0.8 !! 0.3;
     }
 }
 
