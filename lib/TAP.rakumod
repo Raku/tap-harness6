@@ -454,17 +454,16 @@ class Formatter::Text does Formatter {
         $output;
     }
     method format-result(Session $session, TAP::Result $result) {
-        my $output;
         my $name = $session.header;
         if ($result.skip-all) {
-            $output = self.format-return("$name skipped\n");
+            return self.format-return("$name skipped\n");
         } elsif ($result.has-problems($!ignore-exit)) {
-            $output = self.format-test-failure($name, $result);
+            return self.format-test-failure($name, $result);
         } else {
             my $time = self.timer && $result.time ?? sprintf ' %8d ms', Int($result.time * 1000) !! '';
-            $output = self.format-return("$name ok$time\n");
+            my $ok = self.format-success("ok");
+            return self.format-return("$name $ok$time\n");
         }
-        $output;
     }
     method format-test-failure(Str $name, TAP::Result $result) {
         return if self.volume <= Quiet;

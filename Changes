@@ -1,6 +1,7 @@
 Revision history for TAP
 
 {{$NEXT}}
+        - Colorize "ok" on success"
 
 0.3.13  2023-01-13T17:30:11+01:00
         - Fix path separator for RAKULIB
