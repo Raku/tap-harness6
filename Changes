@@ -1,6 +1,8 @@
 Revision history for TAP
 
 {{$NEXT}}
+
+0.3.14  2023-02-06T00:28:13+01:00
         - Colorize "ok" on success"
 
 0.3.13  2023-01-13T17:30:11+01:00
