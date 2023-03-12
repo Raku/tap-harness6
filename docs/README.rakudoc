@@ -90,7 +90,7 @@ C<ignore-exit>
 =end item
 
 =begin item   
- C<trap>
+C<trap>
 
   Attempt to print summary information if run is interrupted by SIGINT (Ctrl-C).
 
@@ -100,7 +100,7 @@ C<ignore-exit>
 =end item
 
 =begin item   
- C<handlers>
+C<handlers>
 
   Default value: C<TAP::Harness::SourceHandler::Raku>
 
