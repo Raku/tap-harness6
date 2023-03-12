@@ -49,7 +49,7 @@ C<jobs>
 =end item
 
 =begin item   
-* C<timer>
+C<timer>
 
   Append run time for each test to output.
 
@@ -59,7 +59,7 @@ C<jobs>
 =end item
 
 =begin item   
-* C<err>
+C<err>
 
   Error reporting configuration.
 
@@ -109,7 +109,7 @@ C<ignore-exit>
 
 =begin table
   | Language | Handler                                        
-  +--------|-------------------------------------------------
+  |--------|-------------------------------------------------
   | Raku    | TAP::Harness::SourceHandler::Raku.new
   | Perl 5  | TAP::Harness::SourceHandler::Exec.new('perl') 
   | Ruby    | TAP::Harness::SourceHandler::Exec.new('ruby')

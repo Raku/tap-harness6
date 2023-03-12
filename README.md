@@ -56,7 +56,7 @@ The constructor returns a new `TAP::Harness` object. It accepts an optional hash
 
         Possible values: An C<Int>
 
-  * * `timer`
+  * `timer`
 
         Append run time for each test to output.
 
@@ -64,7 +64,7 @@ The constructor returns a new `TAP::Harness` object. It accepts an optional hash
 
         Possible values: C<True> C<False>
 
-  * * `err`
+  * `err`
 
         Error reporting configuration.
 
