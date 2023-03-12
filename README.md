@@ -89,20 +89,20 @@ The constructor returns a new `TAP::Harness` object. It accepts an optional hash
 
         Possible values: C<True> C<False>
 
-  *     C<trap>
+  * `trap`
 
-       Attempt to print summary information if run is interrupted by SIGINT (Ctrl-C).
+        Attempt to print summary information if run is interrupted by SIGINT (Ctrl-C).
 
-       Default value: C<False>
+        Default value: C<False>
 
-       Possible values: C<True> C<False>
+        Possible values: C<True> C<False>
 
-  *     C<handlers>
+  * `handlers`
 
-       Default value: C<TAP::Harness::SourceHandler::Raku>
+        Default value: C<TAP::Harness::SourceHandler::Raku>
 
-       Possible values: C<TAP::Harness::SourceHandler::Raku>
-       C<TAP::Harness::SourceHandler::Exec>
+        Possible values: C<TAP::Harness::SourceHandler::Raku>
+        C<TAP::Harness::SourceHandler::Exec>
 
     <table class="pod-table">
     <thead><tr>
