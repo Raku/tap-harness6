@@ -1,0 +1,143 @@
+=begin pod
+
+=NAME
+
+TAP
+
+=DESCRIPTION
+
+An asynchronous TAP framework written in Raku.
+
+=SYNOPSIS
+
+=begin code :lang<Raku>
+use TAP;
+my $harness = TAP::Harness.new(|%args);
+$harness.run(@tests);
+=end code
+
+=METHODS
+
+=head2 Class Methods
+
+=head3 new
+
+=begin code :lang<Raku>
+my %args = jobs => 1, err  => 'ignore';
+my $harness = TAP::Harness.new( |%args );
+=end code
+
+The constructor returns a new C<TAP::Harness> object.
+It accepts an optional hash whose allowed keys are:
+
+=begin item
+C<volume>
+
+  Default value: C<Normal>
+
+  Possible values: C<Silent> C<ReallyQuiet> C<Quiet> C<Normal> C<Verbose>
+=end item
+
+=begin item   
+C<jobs>
+
+  The maximum number of parallel tests to run.
+
+  Default value: C<1>
+
+  Possible values: An C<Int>
+=end item
+
+=begin item   
+* C<timer>
+
+  Append run time for each test to output.
+
+  Default value: C<False>
+
+  Possible values: C<True> C<False>
+=end item
+
+=begin item   
+* C<err>
+
+  Error reporting configuration.
+
+  Default value: C<stderr>
+
+  Possible values: C<stderr> C<ignore> C<merge> C<Supply> C<IO::Handle>
+
+=begin table
+  | Value       | Definition                                        
+  |------------|--------------------------------------------------
+  | stderr    | Direct the test's '$*ERR' to the harness' '$*ERR'
+  | ignore    | Ignore the test scripts' '$*ERR'                  
+  | merge     | Merge the test scripts' '$*ERR' into their '$*OUT`
+  | Supply    | Direct the test's '$*ERR' to a 'Supply'          
+  | IO::Handle | Direct the test's '$*ERR' to an 'IO::Handle'   
+=end table
+
+=end item
+
+=begin item   
+C<ignore-exit>
+
+  If set to C<True> will instruct C<TAP::Parser> to ignore exit and wait for status from test scripts.
+
+  Default value: C<False>
+
+  Possible values: C<True> C<False>
+=end item
+
+=begin item   
+ C<trap>
+
+  Attempt to print summary information if run is interrupted by SIGINT (Ctrl-C).
+
+  Default value: C<False>
+
+  Possible values: C<True> C<False>
+=end item
+
+=begin item   
+ C<handlers>
+
+  Default value: C<TAP::Harness::SourceHandler::Raku>
+
+  Possible values: C<TAP::Harness::SourceHandler::Raku>
+  C<TAP::Harness::SourceHandler::Exec>
+
+=begin table
+  | Language | Handler                                        
+  +--------|-------------------------------------------------
+  | Raku    | TAP::Harness::SourceHandler::Raku.new
+  | Perl 5  | TAP::Harness::SourceHandler::Exec.new('perl') 
+  | Ruby    | TAP::Harness::SourceHandler::Exec.new('ruby')
+  | Python  | TAP::Harness::SourceHandler::Exec.new('python')
+=end table
+
+=end item
+
+=head2 Instance Methods
+
+=head3 run
+
+=begin code :lang<Raku>
+$harness.run(@tests);
+=end code
+
+Accepts an array of C<@tests> to be run. This should generally be the names of test files.
+
+=TODO
+
+These features are currently not implemented but are considered desirable:
+
+=item Rule based parallel scheduling
+=item Source Handlers other than C<::Raku>
+=item Better documentation
+
+=LICENSE
+
+You can use and distribute this module under the terms of the The Artistic License 2.0. See the LICENSE file included in this distribution for complete details.
+
+=end pod
