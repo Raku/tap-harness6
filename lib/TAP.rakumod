@@ -1,17 +1,15 @@
 use v6;
 
-unit module TAP:ver<0.2.1>;
+unit module TAP:ver<0.3.14>;
 
 role Entry {
-    has Str:D $.raw is required handles <Str>;
 }
 class Version does Entry {
     has Int:D $.version is required;
 }
 class Plan does Entry {
     has Int:D $.tests is required;
-    has Bool $.skip-all;
-    has Str $.explanation;
+    has Str $.explanation handles :skip-all<defined>;
 }
 
 enum Directive <No-Directive Skip Todo>;
@@ -40,11 +38,9 @@ class Sub-Test is Test {
         my @plans = @!entries.grep(Plan);
         if !@plans {
             @errors.push: "Subtest $usable-number doesn't have a plan";
-        }
-        elsif @plans > 1 {
+        } elsif @plans > 1 {
             @errors.push: "Subtest $usable-number has multiple plans";
-        }
-        elsif @plans[0].tests != @tests.elems {
+        } elsif @plans[0].tests != @tests.elems {
             @errors.push: "Subtest $usable-number expected { @plans[0].tests } but contains { @tests.elems } tests";
         }
         @errors;
@@ -57,6 +53,9 @@ class Bailout does Entry {
 class Comment does Entry {
     has Str:D $.comment is required;
 }
+class Pragma does Entry {
+    has Bool:D %.identifiers is required;
+}
 class YAML does Entry {
     has Str:D $.serialized is required;
     has Any $.deserialized;
@@ -66,68 +65,68 @@ class Unknown does Entry {
 
 my role Entry::Handler {
     method handle-entry(Entry) { ... }
+    method fail-entries($ex) {
+        self.end-entries;
+    }
     method end-entries() { }
-    method listen(Supply $supply) {
-        $supply.act(-> $entry {
-                self.handle-entry($entry);
-            },
-            done => {
-                self.end-entries();
-            },
-            quit => {
-                self.end-entries();
-            }
-        );
+}
+
+class Status {
+    has Int $.exit;
+    has Int $.signal;
+    multi method new(Int $exit, Int $signal) {
+        self.bless(:$exit, :$signal);
+    }
+    multi method new(Proc $proc) {
+        self.new($proc.exitcode, $proc.signal);
+    }
+    multi method wait(::?CLASS:D:) {
+        ($!exit +< 8) +| $!signal;
+    }
+    multi method wait(::?CLASS:U:) {
+        Int;
     }
 }
 
 class Result {
-    has Str $.name;
-    has Int $.tests-planned;
-    has Int $.tests-run;
-    has Int $.passed;
-    has Int @.failed;
-    has Str @.errors;
-    has Int $.actual-passed;
-    has Int $.actual-failed;
-    has Int $.todo;
-    has Int @.todo-passed;
-    has Int $.skipped;
-    has Int $.unknowns;
-    has Bool $.skip-all;
-    has Proc $.exit-status;
-    has Duration $.time;
-    method exit() {
-        $!exit-status.defined ?? $!exit-status.exitcode !! Int;
-    }
-    method wait() {
-        $!exit-status.defined ?? ($!exit-status.exitcode +< 8) +| $!exit-status.signal !! Int;
-    }
+    has Str:D $.name is required;
+    has Int:_ $.tests-planned is required;
+    has Int:D $.tests-run is required;
+    has Int:D $.passed is required;
+    has Int:D @.failed is required;
+    has Str:D @.errors is required;
+    has Int:D $.actual-passed is required;
+    has Int:D $.actual-failed is required;
+    has Int:D $.todo is required;
+    has Int:D @.todo-passed is required;
+    has Int:D $.skipped is required;
+    has Int:D $.unknowns is required;
+    has Bool:D $.skip-all is required;
+    has Status $.exit-status handles <exit signal wait> is required;
+    has Duration:D $.time is required;
 
-    method has-problems($ignore-exit) {
-        @!failed || @!errors || (!$ignore-exit && self.exit-failed);
-    }
-    method exit-failed() {
-        $!exit-status.defined && ($!exit-status.exitcode || $!exit-status.signal);
+    method has-problems($ignore-exit = False) {
+        so @!failed || @!errors || (!$ignore-exit && $!exit-status.wait);
     }
 }
 
 class Aggregator {
-    has Result %!results-for;
-    has Str @!parse-order;
+    has Result:D %!results-for is built(False);
+    has Str:D @!parse-order is built(False);
 
-    has Int $.tests-planned = 0;
-    has Int $.tests-run = 0;
-    has Int $.passed = 0;
-    has Int $.failed = 0;
-    has Int $.errors = 0;
-    has Int $.actual-passed = 0;
-    has Int $.actual-failed = 0;
-    has Int $.todo = 0;
-    has Int $.todo-passed = 0;
-    has Int $.skipped = 0;
-    has Int $.exit-failed = 0;
-    has Bool $.ignore-exit = False;
+    has Int:D $.tests-planned is built(False) = 0;
+    has Int:D $.tests-run is built(False) = 0;
+    has Int:D $.passed is built(False) = 0;
+    has Int:D $.failed is built(False) = 0;
+    has Int:D $.errors is built(False) = 0;
+    has Int:D $.actual-passed is built(False) = 0;
+    has Int:D $.actual-failed is built(False) = 0;
+    has Int:D $.todo is built(False) = 0;
+    has Int:D $.todo-passed is built(False) = 0;
+    has Int:D $.skipped is built(False) = 0;
+    has Int:D $.exit-failed is built(False) = 0;
+
+    has Bool:D $.ignore-exit = False;
 
     method add-result(Result $result) {
         my $description = $result.name;
@@ -157,22 +156,23 @@ class Aggregator {
 
 
     method has-problems() {
-        $!todo-passed || self.has-errors;
+        so $!todo-passed || self.has-errors;
     }
     method has-errors() {
-        $!failed + $!errors + $!exit-failed;
+        so $!failed + $!errors + $!exit-failed;
     }
     method get-status() {
         self.has-errors || $!tests-run != $!passed ?? 'FAILED' !! $!tests-run ?? 'PASS' !! 'NOTESTS';
     }
 }
 
-my grammar Grammar {
-    regex TOP {
-        ^ [ <plan> | <test> | <bailout> | <version> | <comment> || <unknown> ] $
-    }
+grammar Grammar {
+    token TOP { <entry>+ }
     token sp { <[\s] - [\n]> }
     token num { <[0..9]>+ }
+    token entry {
+        ^^ [ <plan> | <test> | <bailout> | <version> | <comment> | <pragma> | <yaml> | <sub-test> || <unknown> ] \n
+    }
     token plan {
         '1..' <count=.num> <.sp>* [
             '#' <.sp>* $<directive>=[:i 'SKIP'] \S*
@@ -197,6 +197,12 @@ my grammar Grammar {
     token version {
         :i 'TAP version ' <version=.num>
     }
+    token pragma-identifier {
+        $<sign>=<[+-]> $<name>=[<alnum>+]
+    }
+    token pragma {
+        'pragma ' <pragma-identifier>+ % ' '
+    }
     token comment {
         '#' <.sp>* $<comment>=[\N*]
     }
@@ -206,7 +212,7 @@ my grammar Grammar {
         <.indent($indent)> '  ...'
     }
     token sub-entry(Int $indent) {
-        <plan> | <test> | <comment> | <yaml($indent)> | <sub-test($indent)> || <!before <.sp> > <unknown>
+        <plan> | <test> | <comment> | <pragma> | <yaml($indent)> | <sub-test($indent)> || <!before <.sp> > <unknown>
     }
     token indent(Int $indent) {
         '    ' ** { $indent }
@@ -219,151 +225,147 @@ my grammar Grammar {
     token unknown {
         \N*
     }
-    class Actions {
-        method TOP($/) {
-            make $/.values[0].made;
-        }
-        method plan($/) {
-            my %args = :raw(~$/), :tests(+$<count>);
-            if $<directive> {
-                %args<skip-all explanation> = True, ~$<explanation>;
-            }
-            make TAP::Plan.new(|%args);
-        }
-        method description($m) {
-            $m.make: ~$m.subst(/\\('#'|'\\')/, { $_[0] }, :g)
-        }
-        method !make_test($/) {
-            my %args = (:ok($<nok> eq ''));
-            %args<number> = $<num> ?? +$<num> !! Int;
-            %args<description> = $<description>.made if $<description>;
-            %args<directive> = $<directive> ?? TAP::Directive::{~$<directive>.substr(0,4).tclc} !! TAP::No-Directive;
-            %args<explanation> = ~$<explanation> if $<explanation>;
-            %args;
-        }
-        method test($/) {
-            make TAP::Test.new(:raw(~$/), |self!make_test($/));
-        }
-        method bailout($/) {
-            make TAP::Bailout.new(:raw(~$/), :explanation($<explanation> ?? ~$<explanation> !! Str));
-        }
-        method version($/) {
-            make TAP::Version.new(:raw(~$/), :version(+$<version>));
-        }
-        method comment($/) {
-            make TAP::Comment.new(:raw(~$/), :comment(~$<comment>));
-        }
-        method yaml($/) {
-            my $serialized = $<yaml-line>.join('');
-            my $deserialized = try (require YAMLish) ?? YAMLish::load-yaml("---\n$serialized...") !! Any;
-            make TAP::YAML.new(:raw(~$/), :$serialized, :$deserialized);
-        }
-        method sub-entry($/) {
-            make $/.values[0].made;
-        }
-        method sub-test($/) {
-            make TAP::Sub-Test.new(:raw(~$/), :entries(@<sub-entry>».made), |self!make_test($<test>));
-        }
-        method unknown($/) {
-            make TAP::Unknown.new(:raw(~$/));
-        }
+}
+
+class Actions {
+    method TOP($/) {
+        make @<entry>».made;
     }
-    method parse(|c) {
-        my $*tap-indent = 0;
-        nextwith(:actions(Actions), |c);
+    method entry($/) {
+        make $/.values[0].made;
     }
-    method subparse(|c) {
-        my $*tap-indent = 0;
-        nextwith(:actions(Actions), |c);
+    method plan($/) {
+        my %args = :tests(+$<count>);
+        if $<directive> {
+            %args<explanation> = ~$<explanation>;
+        }
+        make TAP::Plan.new(|%args);
+    }
+    method description($m) {
+        $m.make: ~$m.subst(/\\('#'|'\\')/, { $_[0] }, :g)
+    }
+    method !make_test($/) {
+        my %args = (:ok($<nok> eq ''));
+        %args<number> = $<num> ?? +$<num> !! Int;
+        %args<description> = $<description>.made if $<description>;
+        %args<directive> = $<directive> ?? TAP::Directive::{~$<directive>.substr(0,4).tclc} !! TAP::No-Directive;
+        %args<explanation> = ~$<explanation> if $<explanation>;
+        %args;
+    }
+    method test($/) {
+        make TAP::Test.new(|self!make_test($/));
+    }
+    method bailout($/) {
+        make TAP::Bailout.new(:explanation($<explanation> ?? ~$<explanation> !! Str));
+    }
+    method version($/) {
+        make TAP::Version.new(:version(+$<version>));
+    }
+    method pragma-identifier($/) {
+        make $<name> => ?( $<sign> eq '+' );
+    }
+    method pragma($/) {
+        my Bool:D %identifiers = @<pragma-identifier>.map(*.ast);
+        make TAP::Pragma.new(:%identifiers);
+    }
+    method comment($/) {
+        make TAP::Comment.new(:comment(~$<comment>));
+    }
+    method yaml($/) {
+        my $serialized = $<yaml-line>.join('');
+        my $deserialized = try (require YAMLish) ?? YAMLish::load-yaml("---\n$serialized...") !! Any;
+        make TAP::YAML.new(:$serialized, :$deserialized);
+    }
+    method sub-entry($/) {
+        make $/.values[0].made;
+    }
+    method sub-test($/) {
+        my @entries = @<sub-entry>».made;
+        make TAP::Sub-Test.new(:@entries, |self!make_test($<test>));
+    }
+    method unknown($/) {
+        make TAP::Unknown.new;
     }
 }
 
-my sub parser(Supply $input --> Supply) {
+role Output {
+    method print(Str $value) {
+        ...
+    }
+    method say(Str $value) {
+        self.print($value ~ "\n");
+    }
+    method flush() {
+    }
+    method terminal() {
+        False;
+    }
+}
+
+class Output::Handle does Output {
+    has IO::Handle:D $.handle handles(:print<print>, :flush<flush>, :terminal<t>) = $*OUT;
+}
+
+class Output::Supplier does Output {
+    has Supplier:D $.supplier is required;
+    method print(Str $value) {
+        $!supplier.emit($value);
+    }
+}
+
+my sub parse-stream(Supply $input, Output $output --> Supply) {
     supply {
         enum Mode <Normal SubTest Yaml >;
         my Mode $mode = Normal;
         my Str @buffer;
-        sub set-state(Mode $new, Str $line) {
-            $mode = $new;
-            @buffer = $line;
-        }
-        sub emit-unknown(*@more) {
-            @buffer.append: @more;
-            for @buffer -> $raw {
-                emit Unknown.new(:$raw);
-            }
-            @buffer = ();
-            $mode = Normal;
-        }
-        sub emit-reset(Match $entry) {
-            emit $entry.made;
-            @buffer = ();
-            $mode = Normal;
-        }
-
-        my token indented { ^ '    ' }
-
         my $grammar = Grammar.new;
 
-        whenever $input.lines -> $line {
-            if $mode == Normal {
-                if $line ~~ / ^ '  ---' / {
-                    set-state(Yaml, $line);
-                }
-                elsif $line ~~ &indented {
-                    set-state(SubTest, $line);
-                }
-                else {
-                    emit-reset $grammar.parse($line);
+        sub emit-reset($line) {
+            for $grammar.parse($line, :actions(Actions)).made -> $entry {
+                emit $entry;
+            }
+            @buffer = ();
+            $mode = Normal;
+        }
+
+        whenever $input.lines(:!chomp) -> $line {
+            $output.print($line) with $output;
+
+            if $mode === Normal {
+                if $line.starts-with('  ---') {
+                    ($mode, @buffer) = (Yaml, $line);
+                } elsif $line.starts-with('    ') {
+                    ($mode, @buffer) = (SubTest, $line);
+                } else {
+                    emit-reset $line;
                 }
             }
-            elsif $mode == SubTest {
-                if $line ~~ &indented {
-                    @buffer.push: $line;
-                }
-                elsif $grammar.parse($line, :rule('test')) -> $test {
-                    my $raw = (|@buffer, $line).join("\n");
-                    if $grammar.parse($raw, :rule('sub-test')) -> $subtest {
-                        emit-reset $subtest;
-                    }
-                    else {
-                        emit-unknown;
-                        emit-reset $test;
-                    }
-                }
-                else {
-                    emit-unknown $line;
+            elsif $mode === SubTest {
+                @buffer.push: $line;
+                if not $line.starts-with('    ') {
+                    emit-reset @buffer.join('');
                 }
             }
-            elsif $mode == Yaml {
-                if $line ~~ / ^ '  '  $<content>=[\N*] $ / {
-                    @buffer.push: $line;
-                    if $<content> eq '...' {
-                        my $raw = @buffer.join("\n");
-                        if $grammar.parse($raw, :rule('yaml')) -> $yaml {
-                            emit-reset $yaml;
-                        }
-                        else {
-                            emit-unknown;
-                        }
-                    }
-                }
-                else {
-                    emit-unknown $line;
+            elsif $mode === Yaml {
+                @buffer.push: $line;
+                if not $line.starts-with('  ') or $line eq "  ...\n" {
+                    emit-reset @buffer.join('');
                 }
             }
         }
-        LEAVE { emit-unknown }
+        LEAVE { emit-reset @buffer.join('') if @buffer; $output.flush with $output }
     }
 }
 
-enum Formatter::Volume <Silent Quiet Normal Verbose>;
+enum Formatter::Volume (:Silent(-2) :Quiet(-1) :Normal(0) :Verbose(1));
 role Formatter {
     has Bool:D $.timer = False;
     has Formatter::Volume $.volume = Normal;
     has Bool:D $.ignore-exit = False;
 }
 role Reporter {
+    has Output:D $.output is required;
+    has Formatter:D $.formatter handles<volume> is required;
     method summarize(TAP::Aggregator, Bool $interrupted, Duration $duration) { ... }
     method open-test(Str $) { ... }
 }
@@ -401,7 +403,7 @@ class Formatter::Text does Formatter {
             $output ~= self.format-failure("Test run interrupted!\n")
         }
 
-        if $aggregator.failed == 0 {
+        if $aggregator.failed == 0 && $aggregator.tests-run > 0 {
             $output ~= self.format-success("All tests successful.\n");
         }
 
@@ -425,8 +427,7 @@ class Formatter::Text does Formatter {
                     if $result.wait -> $wait {
                         if $result.exit {
                             $output ~= self.format-failure("Non-zero exit status: { $result.exit }\n");
-                        }
-                        else {
+                        } else {
                             $output ~= self.format-failure("Non-zero wait status: $wait\n");
                         }
                     }
@@ -441,7 +442,7 @@ class Formatter::Text does Formatter {
         $output ~= "Files={ $aggregator.result-count }, Tests={ $aggregator.tests-run }$timing\n";
         my $status = $aggregator.get-status;
         $output ~= "Result: $status\n";
-        $output;
+        self.format-return($output);
     }
     method format-success(Str $output) {
         $output;
@@ -453,19 +454,16 @@ class Formatter::Text does Formatter {
         $output;
     }
     method format-result(Session $session, TAP::Result $result) {
-        my $output;
         my $name = $session.header;
         if ($result.skip-all) {
-            $output = self.format-return("$name skipped\n");
-        }
-        elsif ($result.has-problems($!ignore-exit)) {
-            $output = self.format-test-failure($name, $result);
-        }
-        else {
+            return self.format-return("$name skipped\n");
+        } elsif ($result.has-problems($!ignore-exit)) {
+            return self.format-test-failure($name, $result);
+        } else {
             my $time = self.timer && $result.time ?? sprintf ' %8d ms', Int($result.time * 1000) !! '';
-            $output = self.format-return("$name ok$time\n");
+            my $ok = self.format-success("ok");
+            return self.format-return("$name $ok$time\n");
         }
-        $output;
     }
     method format-test-failure(Str $name, TAP::Result $result) {
         return if self.volume <= Quiet;
@@ -480,8 +478,7 @@ class Formatter::Text does Formatter {
 
         if $result.failed == 0 {
             $output ~= self.format-failure($total ?? "All $total subtests passed " !! 'No subtests run');
-        }
-        else {
+        } else {
             $output ~= self.format-failure("Failed {$result.failed.elems}/$total subtests ");
             if (!$total) {
                 $output ~= self.format-failure("\nNo tests run!");
@@ -504,13 +501,6 @@ class Formatter::Text does Formatter {
     }
 }
 class Reporter::Text does Reporter {
-    has IO::Handle $!handle;
-    has Formatter::Text $!formatter handles <volume>;
-
-    submethod BUILD(:@names, :$!handle = $*OUT, :$volume = Normal, :$timer = False, Bool :$ignore-exit) {
-        $!formatter = Formatter::Text.new(:@names, :$volume, :$timer, :$ignore-exit);
-    }
-
     method open-test(Str $name) {
         my $header = $!formatter.format-name($name);
         Reporter::Text::Session.new(:$name, :$header, :reporter(self));
@@ -519,16 +509,15 @@ class Reporter::Text does Reporter {
         self!output($!formatter.format-summary($aggregator, $interrupted, $duration)) unless self.volume === Silent;
     }
     method !output(Any $value) {
-        $!handle.print($value);
+        $!output.print($value);
     }
     method print-result(Reporter::Text::Session $session, TAP::Result $report) {
         self!output($!formatter.format-result($session, $report)) unless self.volume <= Quiet;
     }
 }
 
-class Formatter::Console is Formatter::Text {
-    has $.color;
-    has &colored = $!color && (try require Terminal::ANSIColor) !=== Nil
+class Formatter::Color is Formatter::Text {
+    has &colored = (try require Terminal::ANSIColor) !=== Nil
         ?? ::('Terminal::ANSIColor::EXPORT::DEFAULT::&colored')
         !! sub ($text, $) { $text };
     method format-success(Str $output) {
@@ -571,56 +560,52 @@ class Reporter::Console::Session does Session {
     }
 }
 class Reporter::Console does Reporter {
-    has Formatter::Console $!formatter handles <volume>;
-    has Int $!lastlength;
-    has Supplier $events;
+    has Int $!last-length = 0;
+    has Supplier $events = Supplier.new;
     has Reporter::Console::Session @!active;
-    has Int $!tests;
-    has Int $!fails;
+    has Int $!tests = 0;
+    has Int $!fails = 0;
 
-    submethod BUILD(:@names, IO::Handle :$handle = $*OUT, :$volume = Normal, :$timer = False, Bool :$ignore-exit = False, Bool :$color) {
-        $!formatter = Formatter::Console.new(:@names, :$volume, :$timer, :$ignore-exit, :$color);
-        $!lastlength = 0;
-        $!events = Supplier.new;
-        @!active .= new;
-        $!tests = 0;
-
+    submethod TWEAK(:$!output, :$!formatter) {
         my $now = 0;
         my $start = now;
 
         sub output-ruler(Bool $refresh) {
             my $new-now = now;
-            return if $now == $new-now and !$refresh;
+            return if $now === $new-now and !$refresh;
             $now = $new-now;
             my $header = sprintf '===( %7d;%d', $!tests, $now - $start;
             my @items = @!active.map(*.summary);
             my $ruler = ($header, |@items).join('  ') ~ ')===';
             $ruler = $ruler.substr(0,70) if $ruler.chars > 70;
-            $handle.print($!formatter.format-return($ruler));
+            my $output = $!formatter.format-return($ruler);
+            $!last-length = $output.chars;
+            $!output.print($output);
         }
         multi receive('update', Str $name, Str $header, Int $number, Int $plan) {
             return if self.volume <= Quiet;
             if @!active.elems == 1 {
                 my $status = ($header, $number, '/', $plan // '?').join('');
-                $handle.print($!formatter.format-return($status));
-                $!lastlength = $status.chars + 1;
-            }
-            else {
+                $!output.print($!formatter.format-return($status));
+                $!last-length = $status.chars;
+            } else {
                 output-ruler($number == 1);
             }
         }
         multi receive('bailout', Str $explanation) {
             return if self.volume <= Quiet;
-            $handle.print($!formatter.format-failure("Bailout called.  Further testing stopped: $explanation\n"));
+            $!output.print($!formatter.format-failure("Bailout called.  Further testing stopped: $explanation\n"));
         }
         multi receive('result', Reporter::Console::Session $session, TAP::Result $result) {
             return if self.volume <= Quiet;
-            $handle.print($!formatter.format-return(' ' x $!lastlength) ~ $!formatter.format-result($session, $result));
+            my $output = $!formatter.format-result($session, $result);
+            $!output.print($!formatter.format-return(' ' x $!last-length) ~ $output);
+            $!last-length = $output.chars;
             @!active = @!active.grep(* !=== $session);
             output-ruler(True) if @!active.elems > 1;
         }
         multi receive('summary', TAP::Aggregator $aggregator, Bool $interrupted, Duration $duration) {
-            $handle.print($!formatter.format-summary($aggregator, $interrupted, $duration)) unless self.volume == Silent;
+            $!output.print($!formatter.format-summary($aggregator, $interrupted, $duration)) unless self.volume === Silent;
         }
 
         $!events.Supply.act(-> @args { receive(|@args) });
@@ -648,7 +633,7 @@ class Reporter::Console does Reporter {
 }
 
 my class State does TAP::Entry::Handler {
-    has Range $.allowed-versions = 12 .. 13;
+    has Range $.allowed-versions = 12 .. 14;
     has Int $!tests-planned;
     has Int $!tests-run = 0;
     has Int $!passed = 0;
@@ -661,6 +646,7 @@ my class State does TAP::Entry::Handler {
     has Int $!skipped = 0;
     has Int $!unknowns = 0;
     has Bool $!skip-all = False;
+    has Bool $!strict;
 
     has Promise $.bailout;
     has Int $!seen-lines = 0;
@@ -669,30 +655,37 @@ my class State does TAP::Entry::Handler {
     has Promise $.done = Promise.new;
     has Int $!version;
     has Bool $.loose;
+    has Entry::Handler @!handlers is built;
+    has $!start-time = now;
+
+    submethod TWEAK(Supply :$events) {
+        my $act  = { self.handle-entry($^entry) };
+        my $done = { self.end-entries };
+        my $quit = { self.fail-entries($^ex) };
+        $events.act($act, :$done, :$quit);
+    }
 
     proto method handle-entry(TAP::Entry $entry) {
-        if $!seen-plan == After && $entry !~~ TAP::Comment {
+        if $!seen-plan === After && $entry !~~ TAP::Comment {
             self!add-error("Got line $entry after late plan");
         }
         {*};
+        .handle-entry($entry) for @!handlers;
         $!seen-lines++;
     }
     multi method handle-entry(TAP::Version $entry) {
         if $!seen-lines {
             self!add-error('Seen version declaration mid-stream');
-        }
-        elsif $entry.version !~~ $!allowed-versions {
+        } elsif $entry.version !~~ $!allowed-versions {
             self!add-error("Version must be in range $!allowed-versions");
-        }
-        else {
+        } else {
             $!version = $entry.version;
         }
     }
     multi method handle-entry(TAP::Plan $plan) {
         if $!seen-plan != Unseen {
             self!add-error('Seen a second plan');
-        }
-        else {
+        } else {
             $!tests-planned = $plan.tests;
             $!seen-plan = $!tests-run ?? After !! Before;
             $!skip-all = $plan.skip-all;
@@ -704,21 +697,20 @@ my class State does TAP::Entry::Handler {
         if $found-number.defined && ($found-number != $expected-number) {
             self!add-error("Tests out of sequence.  Found ($found-number) but expected ($expected-number)");
         }
-        if $!seen-plan == After {
+        if $!seen-plan === After {
             self!add-error("Plan must be at the beginning or end of the TAP output");
         }
 
         my $usable-number = $found-number // $expected-number;
         if $test.is-ok {
             $!passed++;
-        }
-        else {
+        } else {
             @!failed.push($usable-number);
         }
         ($test.ok ?? $!actual-passed !! $!actual-failed)++;
-        $!todo++ if $test.directive == TAP::Todo;
-        @!todo-passed.push($usable-number) if $test.ok && $test.directive == TAP::Todo;
-        $!skipped++ if $test.directive == TAP::Skip;
+        $!todo++ if $test.directive === TAP::Todo;
+        @!todo-passed.push($usable-number) if $test.ok && $test.directive === TAP::Todo;
+        $!skipped++ if $test.directive === TAP::Skip;
 
         if !$!loose && $test ~~ TAP::Sub-Test {
             for $test.inconsistencies(~$usable-number) -> $error {
@@ -729,17 +721,28 @@ my class State does TAP::Entry::Handler {
     multi method handle-entry(TAP::Bailout $entry) {
         if $!bailout.defined {
             $!bailout.break($entry);
-        }
-        else {
+        } else {
             $!done.break($entry);
         }
     }
     multi method handle-entry(TAP::Unknown $) {
         $!unknowns++;
+        if $!strict {
+            self!add-error('Seen invalid TAP in strict mode');
+        }
+    }
+    multi method handle-entry(TAP::Pragma $entry) {
+        if $entry.identifiers<strict>:exists {
+            $!strict = $entry.identifiers<strict>;
+        }
     }
     multi method handle-entry(TAP::Entry $entry) {
     }
 
+    method fail-entries($ex) {
+        $!done.break($ex);
+        .fail-entries($ex) for @!handlers;
+    }
     method end-entries() {
         if $!seen-plan == Unseen {
             self!add-error('No plan found in TAP output');
@@ -748,8 +751,11 @@ my class State does TAP::Entry::Handler {
             self!add-error("Bad plan.  You planned $!tests-planned tests but ran $!tests-run.");
         }
         $!done.keep;
+        .end-entries for @!handlers;
     }
-    method finalize(Str $name, Proc $exit-status, Duration $time) {
+    method finalize(Str $name, Status $exit-status) {
+        my $time = now - $!start-time;
+        $!done.cause.rethrow if $!done.status ~~ Broken;
         TAP::Result.new(:$name, :$!tests-planned, :$!tests-run, :$!passed, :@!failed, :@!errors, :$!skip-all,
             :$!actual-passed, :$!actual-failed, :$!todo, :@!todo-passed, :$!skipped, :$!unknowns, :$exit-status, :$time);
     }
@@ -758,59 +764,42 @@ my class State does TAP::Entry::Handler {
     }
 }
 
-my class Run {
+class Parser does Awaitable {
     subset Killable of Any where { .can('kill') };
-    has Supply:D $.events is required;
-    has Promise:D $.process = $!events.Promise;
-    has Killable $!killer;
-    has Promise $!timer;
 
+    has Str $.name;
+    has Promise:D $!process is built = Promise.kept(Status);
+    has Killable $!killer is built;
+    has State $!state is built;
+    has Promise $.promise is built(False) handles <result get-await-handle> = self!build-promise;
+
+    method !build-promise() {
+        my $done = Promise.allof($!state.done, $!process);
+        $done.then({
+            my $exit-status = try { $!process.result } // Status;
+            $!state.finalize($!name, $exit-status);
+        });
+    }
     method kill() {
-        $!killer.kill if $!process;
-    }
-    method exit-status() {
-        $!process.result ~~ Proc ?? $.process.result !! Proc;
-    }
-    method time() {
-        $!timer.defined ?? $!timer.result !! Duration;
+        $!killer.kill if $!killer;
     }
 }
 
 role Source {
-    has Str $.name;
+    has Str:D $.name = '';
+    method parse(Promise :$bailout, Bool :$loose, :@handlers, Output :$output) { ... }
 }
 class Source::Proc does Source {
-    has Str $.path is required;
-    has @.args;
-    has $.err is required;
-}
-class Source::File does Source {
-    has Str $.filename;
-}
-class Source::String does Source {
-    has Str $.content;
-}
-class Source::Supply does Source {
-    has Supply $.supply;
-}
+    has Str @.command is required;
+    has $.cwd = $*CWD;
+    has %.env = %*ENV;
 
-class Async {
-    has Str $.name;
-    has Run $!run handles <kill events>;
-    has State $!state;
-    has Promise $.waiter;
-
-    submethod BUILD(Str :$!name, State :$!state, Run :$!run) {
-        $!waiter = Promise.allof($!state.done, $!run.process);
-    }
-
-    multi get_runner(Source::Proc $proc) {
-        my $async = Proc::Async.new($proc.path, $proc.args);
-        my $events = parser($async.stdout);
+    method parse(Promise :$bailout, Bool :$loose, :@handlers, Output :$output, Any :$err = 'stderr') {
+        my $async = Proc::Async.new(@!command);
+        my $events = parse-stream($async.stdout, $output);
         state $devnull;
         END { $devnull.close with $devnull }
-        given $proc.err {
-            my $err = $_;
+        given $err {
             when 'stderr' { #default is correct
             }
             when 'merge' {
@@ -823,149 +812,226 @@ class Async {
                 $async.bind-stderr($devnull);
             }
             when IO::Handle:D {
-                $async.stderr.lines(:close).act({ $err.say($_) });
+                $async.bind-stderr($err);
             }
-            when Supply:D {
+            when Supplier:D {
                 $async.stderr.act({ $err.emit($_) }, :done({ $err.done }), :quit({ $err.quit($^reason) }));
             }
             default {
                 die "Unknown error handler";
             }
         }
-        my $process = $async.start;
-        my $start-time = now;
-        my $timer = $process.then({ now - $start-time });
-        Run.new(:$process, :killer($async), :$timer, :$events);
+        my $state = State.new(:$bailout, :$loose, :$events, :@handlers);
+        my $start = $async.start(:$!cwd, :ENV(%!env));
+        my $process = $start.then({ Status.new($start.result) });
+        Parser.new(:$!name, :$state, :$process, :killer($async));
     }
-    multi get_runner(Source::Supply $supply) {
-        my $start-time = now;
-        my $events = parser($supply.supply);
-        Run.new(:$events);
+}
+class Source::File does Source {
+    has IO::Path:D(Str) $.filename is required;
+
+    method parse(Promise :$bailout, Bool :$loose, :@handlers, Output :$output) {
+        my $events = parse-stream(supply { emit $!filename.slurp(:close) }, $output);
+        my $state = State.new(:$bailout, :$loose, :$events, :@handlers);
+        Parser.new(:$!name, :$state);
     }
-    multi get_runner(Source::File $file) {
-        my $events = parser(supply { emit $file.filename.IO.slurp(:close) });
-        Run.new(:$events);
+}
+class Source::String does Source {
+    has Str:D $.content is required;
+
+    method parse(Promise :$bailout, Bool :$loose, :@handlers, Output :$output) {
+        my $events = parse-stream(supply { emit $!content }, $output);
+        my $state = State.new(:$bailout, :$loose, :$events, :@handlers);
+        Parser.new(:$!name, :$state);
     }
-    multi get_runner(Source::String $string) {
-        my $events = parser(supply { emit $string.content });
-        Run.new(:$events);
+}
+class Source::Supply does Source {
+    has Supply:D $.supply is required;
+
+    method parse(Promise :$bailout, Bool :$loose, Output :$output, :@handlers) {
+        my $events = parse-stream($!supply, $output);
+        my $state = State.new(:$bailout, :$loose, :$events, :@handlers);
+        Parser.new(:$!name, :$state);
+    }
+}
+
+subset SourceHandler::Priority of Numeric where 0..1;
+
+role SourceHandler {
+    method can-handle {...};
+
+    proto method make-source(|) { * };
+    multi method make-source(IO:D $path, IO:D() :$cwd = $path.CWD, *%args) {
+        self.make-source($path.relative($cwd), :$cwd, |%args);
+    }
+    multi method make-source(::?CLASS:U: Str:D $name, *%args) {
+        self.new.make-source($name, |%args);
     }
 
-    method new(Source :$source, Promise :$bailout, Bool :$loose) {
-        my $state = State.new(:$bailout, :$loose);
-        my $run = get_runner($source);
-        $state.listen($run.events);
-        Async.bless(:name($source.name), :$state, :$run);
+    method make-parser(Any:D $name, Promise :$bailout, Bool :$loose, :@handlers, Output :$output, Any:D :$err = 'stderr', *%args) {
+        my $source = self.make-source($name, |%args);
+        $source.parse(:$bailout, :$loose, :$output, :$err, :@handlers);
     }
+}
 
-    has TAP::Result $!result;
-    method result {
-        await $!waiter;
-        $!result //= $!state.finalize($!name, $!run.exit-status, $!run.time);
+my sub normalize-path($path, IO::Path $cwd) {
+    $path ~~ IO ?? $path.relative($cwd) !! ~$path
+}
+
+class SourceHandler::Raku does SourceHandler {
+    has Str:D $.path = $*EXECUTABLE.absolute;
+    has @.incdirs;
+    multi method make-source(::?CLASS:D: Str:D $name, IO:D() :$cwd = $*CWD, :%env is copy = %*ENV, :@include-dirs = (), *%) {
+        my @raku-lib = (%env<RAKULIB> // "").split(",", :skip-empty);
+        my @normalized = map { normalize-path($^dir, $cwd) }, flat @include-dirs, @!incdirs;
+        @raku-lib.prepend(@normalized);
+        %env<RAKULIB> = @raku-lib.join(',');
+        TAP::Source::Proc.new(:$name, :command[ $!path, $name ], :$cwd, :%env);
+    }
+    method can-handle(IO::Path $name) {
+        $name.extension eq 't6'|'rakutest' || $name.lines.head ~~ / ^ '#!' .* [ 'raku' | 'perl6' ] / ?? 0.8 !! 0.3;
+    }
+}
+
+class SourceHandler::Exec does SourceHandler {
+    has @.args;
+    has SourceHandler::Priority $.priority = 1;
+    method new (*@args) {
+        self.bless(:@args);
+    }
+    method can-handle(IO::Path $name) {
+        $!priority;
+    }
+    multi method make-source(::?CLASS:D: Str:D $name, IO:D() :$cwd = $*CWD, *%) {
+        my $executable = ~$cwd.add($name);
+        my @command = (|@!args, $executable);
+        TAP::Source::Proc.new(:$name, :@command, :$cwd);
+    }
+}
+
+class SourceHandler::File does SourceHandler {
+    method can-handle(IO::Path $name) {
+        $name.extension eq 'tap' ?? 1 !! 0;
+    }
+    multi method make-source(::?CLASS:D: Str:D $name, IO:D() :$cwd = $*CWD, *%) {
+        my $filename = $cwd.add($name);
+        TAP::Source::File.new(:$name, :$filename);
+    }
+}
+
+class SourceHandlers {
+    has TAP::SourceHandler @.handlers = ( SourceHandler::Raku.new, TAP::SourceHandler::File.new );
+    multi method make-source(Str $path, IO:D(Str) :$cwd, *%args) {
+        self.make-source(IO::Path.new($path, :CWD(~$cwd)), :$cwd, |%args);
+    }
+    multi method make-source(IO:D $path, IO:D(Str) :$cwd = $path.CWD, *%args) {
+        @!handlers.max(*.can-handle($path)).make-source($path.relative($cwd), :$cwd, |%args)
+    }
+    multi method make-parser(Any:D $path, Promise :$bailout, Bool :$loose, :@handlers, Output :$output, Any:D :$err = 'stderr', *%args) {
+        my $source = self.make-source($path, |%args);
+        $source.parse(:$bailout, :$loose, :$output, :$err, :@handlers);
+    }
+    method COERCE($handlers) {
+        self.new(:handlers($handlers.list));
     }
 }
 
 class Harness {
-    role SourceHandler {
-        method can-handle {...};
-        method make-source {...};
-    }
-    role SourceHandler::Proc does SourceHandler {
-        has Str:D $.path is required;
-        has @.args;
-        method make-source(Str:D $name, Any:D :$err) {
-            TAP::Source::Proc.new(:$name, :$!path, :args[ |@!args, $name ], :$err);
-        }
-    }
-    class SourceHandler::Raku does SourceHandler::Proc {
-        submethod BUILD(:@incdirs, Str:D :$!path = $*EXECUTABLE.absolute) {
-            @!args = @incdirs.map("-I" ~ *);
-        }
-        method can-handle(Str $name) {
-            0.5;
-        }
-    }
-    class SourceHandler::Perl6 is SourceHandler::Raku {
-        # This may later give deprecation warnings
-    }
-    class SourceHandler::Exec does SourceHandler::Proc {
-        method new (*@ ($path, *@args)) {
-            self.bless(:$path, :@args);
-        }
-        method can-handle(Str $name) {
-            1;
-        }
+    # Backwards compatibility
+    class SourceHandler {
+        constant Raku = TAP::SourceHandler::Raku;
+        constant Perl6 = TAP::SourceHandler::Raku; # will be removed later
+        constant Exec = TAP::SourceHandler::Exec;
     }
 
-    my sub load-reporter(Str $name --> Reporter) {
-        my $classname = $name.subst('-', '::', :g);
-        my $loaded = try ::($classname);
-        return $loaded if $loaded !eqv Any;
-        require ::($classname);
-        return ::($classname);
-    }
+    subset OutVal where any(IO::Handle:D, Supplier:D);
 
-    has SourceHandler @.handlers = SourceHandler::Raku.new();
+    has SourceHandlers() $.handlers = SourceHandlers.new;
     has IO::Handle $.handle = $*OUT;
+    has OutVal $.output = $!handle;
     has Formatter::Volume $.volume = ?%*ENV<HARNESS_VERBOSE> ?? Verbose !! Normal;
     has Str %!env-options = (%*ENV<HARNESS_OPTIONS> // '').split(':').grep(*.chars).map: { / ^ (.) (.*) $ /; ~$0 => val(~$1) };
-    has TAP::Reporter:U $.reporter-class = %!env-options<r> ?? load-reporter(%!env-options<r>) !! $!handle.t && $!volume < Verbose ?? TAP::Reporter::Console !! TAP::Reporter::Text;
+    has TAP::Reporter:U $.reporter-class;
     has Int:D $.jobs = %!env-options<j> // 1;
     has Bool:D $.timer = ?%*ENV<HARNESS_TIMER>;
-    subset ErrValue where any(IO::Handle:D, Supply, 'stderr', 'ignore', 'merge');
+    subset ErrValue where any(IO::Handle:D, Supplier, 'stderr', 'ignore', 'merge');
     has ErrValue $.err = 'stderr';
     has Bool:D $.ignore-exit = ?%*ENV<HARNESS_INGORE_EXIT>;
     has Bool:D $.trap = False;
     has Bool:D $.loose = $*PERL.compiler.version before 2017.09;
-    my @safe-terminals = <xterm eterm vte konsole color>;
-    has Bool:D $.color = so %!env-options<c> // %*ENV<HARNESS_COLOR> // !%*ENV<NO_COLOR>.defined && $!handle.t && (%*ENV<TERM> // '') ~~ / @safe-terminals /;
+    has Bool $.color;
 
-    class Run {
-        has Promise $.waiter handles <result>;
-        has Promise $!killed;
-        submethod BUILD (Promise :$!waiter, Promise :$!killed) {
-        }
-        method kill(Any:D $reason) {
-            $!killed.break($reason);
-        }
+    class Run does Awaitable {
+        has Promise $!promise handles <result get-await-handle> is built;
+        has Promise $!bailout is built handles :kill<break>;
     }
 
-    method make-aggregator() {
-        TAP::Aggregator.new(:$!ignore-exit);
-    }
-    method add-handlers(Supply $events) {
-        if $.volume == Verbose {
-            $events.act({ $!handle.say(~$^entry) }, :done({ $!handle.flush }), :quit({ $!handle.flush }));
-        }
-    }
-    method make-source(Str $name) {
-        @!handlers.max(*.can-handle($name)).make-source($name, :$!err);
-    }
     my &sigint = sub { signal(SIGINT) }
 
-    method run(*@sources) {
-        my $killed = Promise.new;
-        my $aggregator = self.make-aggregator;
-        my $reporter = $!reporter-class.new(:names(@sources), :$!timer, :$!ignore-exit, :$!volume, :$!handle, :$!color);
+    my multi make-output(IO::Handle:D $handle) {
+        return Output::Handle.new(:$handle);
+    }
+    my multi make-output(Supplier:D $supplier) {
+        return Output::Supplier.new(:$supplier);
+    }
+
+    method !get-reporter(Output $output) {
+        if $!reporter-class !=== Reporter {
+            $!reporter-class;
+        } elsif %!env-options<r> {
+            my $classname = %!env-options<r>.subst('-', '::', :g);
+            my $loaded = try ::($classname);
+            return $loaded if $loaded !eqv Any;
+            require ::($classname);
+            ::($classname);
+        } elsif $output.terminal && $!volume < Verbose {
+            TAP::Reporter::Console;
+        } else {
+            TAP::Reporter::Text;
+        }
+    }
+
+    method !get-color(Output $output) {
+        with $!color {
+            $!color;
+        } orwith %!env-options<c> {
+            True;
+        } orwith %*ENV<HARNESS_COLOR> {
+            ?%*ENV<HARNESS_COLOR>;
+        } orwith %*ENV<NO_COLOR> {
+            False;
+        } else {
+            state @safe-terminals = <xterm eterm vte konsole color>;
+            $output.terminal && (%*ENV<TERM> // '') ~~ / @safe-terminals /;
+        }
+    }
+
+    method run(*@names, IO(Str) :$cwd = $*CWD, OutVal :$out = $!output, ErrValue :$err = $!err, *%handler-args) {
+        my $bailout = Promise.new;
+        my $aggregator = TAP::Aggregator.new(:$!ignore-exit);
+        my $output = make-output($out);
+        my $formatter-class = self!get-color($output) ?? Formatter::Color !! Formatter::Text;
+        my $formatter = $formatter-class.new(:@names, :$!volume, :$!timer, :$!ignore-exit);
+        my $reporter-class = self!get-reporter($output);
+        my $reporter = $reporter-class.new(:$output, :$formatter);
 
         my @working;
-        my $waiter = start {
-            my $int = $!trap ?? sigint().tap({ $killed.break("Interrupted"); $int.close(); }) !! Tap;
+        my $promise = start {
+            my $int = $!trap ?? sigint().tap({ $bailout.break("Interrupted"); $int.close(); }) !! Tap;
             my $begin = now;
             try {
-                for @sources -> $name {
-                    my $session = $reporter.open-test($name);
-                    my $source = self.make-source($name);
-                    my $parser = TAP::Async.new(:$source, :$killed, :$!loose);
-                    $session.listen($parser.events);
-                    self.add-handlers($parser.events);
-                    @working.push({ :$parser, :$session, :done($parser.waiter) });
+                for @names -> $name {
+                    my $source = $!handlers.make-source($name, :$cwd, |%handler-args);
+                    my $session = $reporter.open-test($source.name);
+                    my @handlers = $session;
+                    my $parser = $source.parse(:$bailout, :$!loose, :$err, :@handlers, :output($!volume === Verbose ?? $output !! Output));
+                    @working.push({ :$parser, :$session, :done($parser.promise) });
                     next if @working < $!jobs;
-                    await Promise.anyof(@working»<done>, $killed);
+                    await Promise.anyof(@working»<done>, $bailout);
                     reap-finished();
                 }
                 while @working {
-                    await Promise.anyof(@working»<done>, $killed);
+                    await Promise.anyof(@working»<done>, $bailout);
                     reap-finished();
                 }
                 CATCH {
@@ -975,24 +1041,23 @@ class Harness {
                     }
                 }
             }
-            $reporter.summarize($aggregator, ?$killed, now - $begin) if !$killed || $!trap;
+            $reporter.summarize($aggregator, ?$bailout, now - $begin) if !$bailout || $!trap;
             $int.close if $int;
             $aggregator;
         }
         sub reap-finished() {
             my @new-working;
-            for @working -> $current {
-                if $current<done> {
-                    $aggregator.add-result($current<parser>.result);
-                    $current<session>.close-test($current<parser>.result);
-                }
-                else {
+            for @working -> $current (:$done, :$parser, :$session) {
+                if $done {
+                    $aggregator.add-result($parser.result);
+                    $session.close-test($parser.result);
+                } else {
                     @new-working.push($current);
                 }
             }
             @working = @new-working;
         }
-        Run.new(:$waiter, :$killed);
+        Run.new(:$promise, :$bailout);
     }
 }
 

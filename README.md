@@ -1,6 +1,6 @@
 # NAME
 
-TAP::Harness
+TAP
 
 # DESCRIPTION
 
@@ -9,7 +9,7 @@ An asynchronous TAP framework written in Raku.
 # SYNOPSIS
 
 ```Raku
-use TAP::Harness;
+use TAP;
 my $harness = TAP::Harness.new(|%args);
 $harness.run(@tests);
 ```
