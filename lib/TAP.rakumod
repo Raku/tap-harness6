@@ -2,6 +2,23 @@ use v6;
 
 unit module TAP:ver<0.3.14>;
 
+package X {
+    class Bailout is Exception {
+        has Str $.explanation;
+
+        method message() {
+            my $explanation = $!explanation // 'no reason given';
+            return "Bailed out: $explanation";
+        }
+    }
+
+    class Interrupted is Exception {
+        method message() {
+            return "Interrupted";
+        }
+    }
+}
+
 role Entry {
 }
 class Version does Entry {
@@ -719,10 +736,11 @@ my class State does TAP::Entry::Handler {
         }
     }
     multi method handle-entry(TAP::Bailout $entry) {
+        my $ex = X::Bailout.new(explanation => $entry.explanation);
         if $!bailout.defined {
-            $!bailout.break($entry);
+            $!bailout.break($ex);
         } else {
-            $!done.break($entry);
+            $!done.break($ex);
         }
     }
     multi method handle-entry(TAP::Unknown $) {
@@ -1017,7 +1035,7 @@ class Harness {
 
         my @working;
         my $promise = start {
-            my $int = $!trap ?? sigint().tap({ $bailout.break("Interrupted"); $int.close(); }) !! Tap;
+            my $int = $!trap ?? sigint().tap({ $bailout.break(X::Interrupted.new); $int.close(); }) !! Tap;
             my $begin = now;
             try {
                 for @names -> $name {
@@ -1029,15 +1047,17 @@ class Harness {
                     next if @working < $!jobs;
                     await Promise.anyof(@working»<done>, $bailout);
                     reap-finished();
+                    await $bailout if $bailout;
                 }
                 while @working {
                     await Promise.anyof(@working»<done>, $bailout);
                     reap-finished();
+                    await $bailout if $bailout;
                 }
                 CATCH {
-                    when "Interrupted" {
-                        reap-finished();
-                        @working».<parser>».kill;
+                    reap-finished();
+                    @working».<parser>».kill;
+                    when (X::Bailout | X::Interrupted) {
                     }
                 }
             }
