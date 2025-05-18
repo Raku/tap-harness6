@@ -1,6 +1,6 @@
 use v6;
 
-unit module TAP:ver<0.3.14>;
+unit module TAP:ver<0.3.15>;
 
 package X {
     class Bailout is Exception {
