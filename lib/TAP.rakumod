@@ -640,7 +640,7 @@ class Reporter::Console does Reporter {
         $!events.emit(['result', $session, $result]);
     }
     method summarize(TAP::Aggregator $aggregator, Duration $duration) {
-        $!events.emit(['summary', $aggregator, $duration]);
+        $!events.emit(['summary', $aggregator, $duration]) unless self.volume === Silent;
     }
 
     method open-test(Str $name) {
