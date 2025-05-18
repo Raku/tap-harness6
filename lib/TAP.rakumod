@@ -128,6 +128,7 @@ class Result {
 }
 
 class Aggregator {
+    has Promise $!bailout is built(True);
     has Result:D %!results-for is built(False);
     has Str:D @!parse-order is built(False);
 
@@ -180,6 +181,10 @@ class Aggregator {
     }
     method get-status() {
         self.has-errors || $!tests-run != $!passed ?? 'FAILED' !! $!tests-run ?? 'PASS' !! 'NOTESTS';
+    }
+
+    method bailout {
+        return $!bailout ?? $!bailout.cause !! Exception;
     }
 }
 
@@ -383,7 +388,7 @@ role Formatter {
 role Reporter {
     has Output:D $.output is required;
     has Formatter:D $.formatter handles<volume> is required;
-    method summarize(TAP::Aggregator, Bool $interrupted, Duration $duration) { ... }
+    method summarize(TAP::Aggregator, Duration $duration) { ... }
     method open-test(Str $) { ... }
 }
 
@@ -413,14 +418,15 @@ class Formatter::Text does Formatter {
         my @now = $.timer ?? ~DateTime.new(now, :formatter{ '[' ~ .hour ~ ':' ~ .minute ~ ':' ~ .second.Int ~ ']' }) !! ();
         (|@now, $name, $periods).join(' ');
     }
-    method format-summary(TAP::Aggregator $aggregator, Bool $interrupted, Duration $duration) {
+    method format-summary(TAP::Aggregator $aggregator, Duration $duration) {
         my $output = '';
 
-        if $interrupted {
-            $output ~= self.format-failure("Test run interrupted!\n")
-        }
-
-        if $aggregator.failed == 0 && $aggregator.tests-run > 0 {
+        if $aggregator.bailout ~~ X::Interrupted {
+            $output ~= self.format-failure("Test run interrupted!\n");
+        } elsif $aggregator.bailout ~~ X::Bailout {
+            my $explanation = $aggregator.bailout.explanation // 'no reason given';
+            $output ~= self.format-failure("Bailed out: $explanation\n");
+        } elsif $aggregator.failed == 0 && $aggregator.tests-run > 0 {
             $output ~= self.format-success("All tests successful.\n");
         }
 
@@ -522,8 +528,8 @@ class Reporter::Text does Reporter {
         my $header = $!formatter.format-name($name);
         Reporter::Text::Session.new(:$name, :$header, :reporter(self));
     }
-    method summarize(TAP::Aggregator $aggregator, Bool $interrupted, Duration $duration) {
-        self!output($!formatter.format-summary($aggregator, $interrupted, $duration)) unless self.volume === Silent;
+    method summarize(TAP::Aggregator $aggregator, Duration $duration) {
+        self!output($!formatter.format-summary($aggregator, $duration)) unless self.volume === Silent;
     }
     method !output(Any $value) {
         $!output.print($value);
@@ -554,10 +560,6 @@ class Reporter::Console::Session does Session {
     has Int:D $.number = 0;
     proto method handle-entry(TAP::Entry $entry) {
         {*};
-    }
-    multi method handle-entry(TAP::Bailout $bailout) {
-        my $explanation = $bailout.explanation // '';
-        $!reporter.bailout($explanation);
     }
     multi method handle-entry(TAP::Plan $plan) {
         $!plan = $plan.tests;
@@ -621,8 +623,8 @@ class Reporter::Console does Reporter {
             @!active = @!active.grep(* !=== $session);
             output-ruler(True) if @!active.elems > 1;
         }
-        multi receive('summary', TAP::Aggregator $aggregator, Bool $interrupted, Duration $duration) {
-            $!output.print($!formatter.format-summary($aggregator, $interrupted, $duration)) unless self.volume === Silent;
+        multi receive('summary', TAP::Aggregator $aggregator, Duration $duration) {
+            $!output.print($!formatter.format-summary($aggregator, $duration)) unless self.volume === Silent;
         }
 
         $!events.Supply.act(-> @args { receive(|@args) });
@@ -637,8 +639,8 @@ class Reporter::Console does Reporter {
     method print-result(Reporter::Console::Session $session, TAP::Result $result) {
         $!events.emit(['result', $session, $result]);
     }
-    method summarize(TAP::Aggregator $aggregator, Bool $interrupted, Duration $duration) {
-        $!events.emit(['summary', $aggregator, $interrupted, $duration]);
+    method summarize(TAP::Aggregator $aggregator, Duration $duration) {
+        $!events.emit(['summary', $aggregator, $duration]);
     }
 
     method open-test(Str $name) {
@@ -742,6 +744,7 @@ my class State does TAP::Entry::Handler {
         } else {
             $!done.break($ex);
         }
+        self!add-error($entry.explanation ?? "Bail out! $entry.explanation()" !! 'Bail out!');
     }
     multi method handle-entry(TAP::Unknown $) {
         $!unknowns++;
@@ -1026,7 +1029,7 @@ class Harness {
 
     method run(*@names, IO(Str) :$cwd = $*CWD, OutVal :$out = $!output, ErrValue :$err = $!err, *%handler-args) {
         my $bailout = Promise.new;
-        my $aggregator = TAP::Aggregator.new(:$!ignore-exit);
+        my $aggregator = TAP::Aggregator.new(:$!ignore-exit, :$bailout);
         my $output = make-output($out);
         my $formatter-class = self!get-color($output) ?? Formatter::Color !! Formatter::Text;
         my $formatter = $formatter-class.new(:@names, :$!volume, :$!timer, :$!ignore-exit);
@@ -1061,7 +1064,7 @@ class Harness {
                     }
                 }
             }
-            $reporter.summarize($aggregator, ?$bailout, now - $begin) if !$bailout || $!trap;
+            $reporter.summarize($aggregator, now - $begin);
             $int.close if $int;
             $aggregator;
         }
